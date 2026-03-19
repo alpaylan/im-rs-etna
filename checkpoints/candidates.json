@@ -1,0 +1,190 @@
+{
+  "project": "im-rs",
+  "total_commits_scanned": 474,
+  "candidates": [
+    {
+      "id": 1,
+      "hash": "3f4e01a43254fe228d1ce64e47dfaf4edc8f4f19",
+      "message": "Fix OrdMap::range including keys outside of requested range if end bound doesn't exist in tree.",
+      "files": [
+        "src/nodes/btree.rs",
+        "src/ord/map.rs"
+      ],
+      "diff_size": 20,
+      "classification": "expression",
+      "bug_type": "off-by-one",
+      "description": "path.push((self, index)) should be path.push((self, index - 1)). When end bound is not found in the btree, the range iterator included one extra key.",
+      "files_exist": true,
+      "suitability": "excellent"
+    },
+    {
+      "id": 2,
+      "hash": "1e8c3e44605efe86511f75fdfea2017d5209b321",
+      "message": "Fix RRB target index lookup",
+      "files": [
+        "src/nodes/rrb.rs"
+      ],
+      "diff_size": 2,
+      "classification": "expression",
+      "bug_type": "wrong-control-flow",
+      "description": "'if' should be 'while' \u2014 when size_table[target_idx] <= index, a single if was insufficient; needed to loop to find the correct child.",
+      "files_exist": true,
+      "suitability": "excellent"
+    },
+    {
+      "id": 3,
+      "hash": "bdd4144c3ba824eeccaefee66c1d4c5324fc3df0",
+      "message": "Fix bug occurring in sort on small sizes.",
+      "files": [
+        "src/sort.rs"
+      ],
+      "diff_size": 4,
+      "classification": "statement",
+      "bug_type": "wrong-scope",
+      "description": "Variable 'equal_swap_side' was declared outside the loop but should be re-initialized inside each iteration. Caused stale state across loop iterations.",
+      "files_exist": true,
+      "suitability": "excellent"
+    },
+    {
+      "id": 4,
+      "hash": "f7449127b83327b82d82690e8333c552014149c8",
+      "message": "Fix logic error in Vector::ptr_eq & PartialEq",
+      "files": [
+        "src/vector/mod.rs"
+      ],
+      "diff_size": 35,
+      "classification": "expression",
+      "bug_type": "operator-precedence",
+      "description": "Missing parentheses in boolean expression: '&& (a && b) || c' was parsed as '(&& a && b) || c' due to precedence. Two identical sites (ptr_eq and PartialEq).",
+      "files_exist": true,
+      "suitability": "excellent"
+    },
+    {
+      "id": 5,
+      "hash": "005193a268e4e9939a50eff0fe6e4f232a1facf4",
+      "message": "Fix incomplete eq implementation for single chunks.",
+      "files": [
+        "src/vector/mod.rs"
+      ],
+      "diff_size": 7,
+      "classification": "statement",
+      "bug_type": "missing-fallback",
+      "description": "For Single variant, cmp_chunk shortcut returned result directly without falling back to full iterator comparison when chunks didn't match.",
+      "files_exist": true,
+      "suitability": "good"
+    },
+    {
+      "id": 6,
+      "hash": "cf08eec952de61db31eed0fb7ccbe06715fe6086",
+      "message": "Fix removal logic",
+      "files": [
+        "src/nodes/btree.rs"
+      ],
+      "diff_size": 12,
+      "classification": "statement",
+      "bug_type": "wrong-condition-order",
+      "description": "PullUp (predecessor/successor) must be attempted before Steal. The original code tried to steal first, which corrupted the tree when the node wasn't small.",
+      "files_exist": true,
+      "suitability": "good"
+    },
+    {
+      "id": 7,
+      "hash": "c35a913eb24a232c4dd71803885f1d13c1f7ea53",
+      "message": "Fix bug in remove_index for OrdMap (#141)",
+      "files": [
+        "src/nodes/btree.rs"
+      ],
+      "diff_size": 40,
+      "classification": "structural",
+      "bug_type": "wrong-algorithm",
+      "description": "Restructured the remove_index match arms: old code used is_leaf() checks with wrong logic for deciding between StealFrom and PullUp. New code handles (Some, None), (None, Some), (Some, Some) cases separately.",
+      "files_exist": true,
+      "suitability": "fair"
+    },
+    {
+      "id": 8,
+      "hash": "c2c893cfc0376fd56759917497db8fcf2f7958a7",
+      "message": "Add overflow check paths for some methods that overflow on trees that tall enough.",
+      "files": [
+        "src/nodes/rrb.rs"
+      ],
+      "diff_size": 25,
+      "classification": "statement",
+      "bug_type": "missing-overflow-check",
+      "description": "NODE_SIZE.pow(level) can overflow usize for very deep trees. Added checked_pow with fallback logic at 3 sites.",
+      "files_exist": true,
+      "suitability": "fair"
+    },
+    {
+      "id": 9,
+      "hash": "0b24f6398d92de809513b0912925441e4550bc7f",
+      "message": "Fix quadratic worst case in quicksort for Vectors",
+      "files": [
+        "src/sort.rs"
+      ],
+      "diff_size": 22,
+      "classification": "structural",
+      "bug_type": "wrong-algorithm",
+      "description": "Added randomized pivot selection to prevent O(n\u00b2) worst case. Changed function signature to accept RNG parameter.",
+      "files_exist": true,
+      "suitability": "fair"
+    },
+    {
+      "id": 10,
+      "hash": "c5fd5912a3ae9d5bfecd2f8ba113eafe1c206bbd",
+      "message": "Guard against vector length overflows.",
+      "files": [
+        "src/vector/mod.rs"
+      ],
+      "diff_size": 17,
+      "classification": "statement",
+      "bug_type": "missing-overflow-check",
+      "description": "Used checked_add for length arithmetic in Vector::append to prevent integer overflow. Multiple sites.",
+      "files_exist": true,
+      "suitability": "fair"
+    },
+    {
+      "id": 11,
+      "hash": "1209e823b633c7ac73ae686896382b7207a907ac",
+      "message": "RRB size table: don't pop conditional on cfg(debug_assertions)",
+      "files": [
+        "src/nodes/rrb.rs"
+      ],
+      "diff_size": 3,
+      "classification": "expression",
+      "bug_type": "debug-conditional-side-effect",
+      "description": "debug_assert_eq!(value, size_table.pop_front()) \u2014 the pop_front() side effect was only executed in debug builds. Split into separate let + debug_assert.",
+      "files_exist": true,
+      "suitability": "excellent"
+    },
+    {
+      "id": 12,
+      "hash": "41d9972538d49ffa3964e3a94109619ce053ef36",
+      "message": "Fix btree::Node::path_next/path_prev",
+      "files": [
+        "src/nodes/btree.rs",
+        "src/ord/map.rs"
+      ],
+      "diff_size": 60,
+      "classification": "structural",
+      "bug_type": "missing-backtracking",
+      "description": "path_next and path_prev returned empty Vec when reaching end of a node, instead of backtracking up the tree to find the next/prev key.",
+      "files_exist": true,
+      "suitability": "poor"
+    },
+    {
+      "id": 13,
+      "hash": "e60084196d01f6468614c9b008afa04c1d47a2c0",
+      "message": "Fix RemoveAction::PullUp semantics",
+      "files": [
+        "src/nodes/btree.rs"
+      ],
+      "diff_size": 118,
+      "classification": "structural",
+      "bug_type": "wrong-semantics",
+      "description": "Changed PullUp from pulling next-level item to pulling highest/lowest in subtree. Involved changing enum variant from usize to Boundary enum and restructuring removal logic.",
+      "files_exist": true,
+      "suitability": "poor"
+    }
+  ]
+}

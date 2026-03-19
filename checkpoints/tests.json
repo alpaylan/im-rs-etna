@@ -1,0 +1,51 @@
+{
+  "base": {
+    "passed": true,
+    "total_tests": 115,
+    "failures": 0
+  },
+  "variants": {
+    "range_off_by_one_1": {
+      "passed": false,
+      "total_tests": 106,
+      "failures": 2,
+      "failing_tests": [
+        "ord::map::test::range_iter_big",
+        "ord::map::test::ranged_iter"
+      ],
+      "mode": "debug"
+    },
+    "rrb_debug_pop_1": {
+      "passed_debug": true,
+      "passed_release": false,
+      "note": "Bug only manifests in release mode (debug_assert disabled)",
+      "mode": "release",
+      "failure_type": "crash (SIGABRT)"
+    },
+    "ptr_eq_precedence_1": {
+      "passed": false,
+      "total_tests": 106,
+      "failures": 2,
+      "failing_tests": [
+        "vector::test::issue_131",
+        "vector::test::ptr_eq"
+      ],
+      "mode": "debug"
+    },
+    "eq_single_chunk_1": {
+      "passed": false,
+      "total_tests": 106,
+      "failures": 7,
+      "failing_tests": [
+        "lib_test::update_in",
+        "ser::test::ser_vector",
+        "tests::vector::comprehensive",
+        "vector::test::chunks",
+        "vector::test::iter_mut",
+        "vector::test::focus",
+        "vector::test::chunks_mut"
+      ],
+      "mode": "debug"
+    }
+  }
+}

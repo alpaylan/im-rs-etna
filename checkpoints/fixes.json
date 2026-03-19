@@ -1,0 +1,104 @@
+{
+  "fixes": [
+    {
+      "rank": 1,
+      "id": 1,
+      "hash": "3f4e01a4",
+      "title": "OrdMap::range off-by-one",
+      "file": "src/nodes/btree.rs",
+      "line": 449,
+      "fixed_code": "                    path.push((self, index - 1));",
+      "buggy_code": "                    path.push((self, index));",
+      "context": "In path_prev(), when the search key is not found and we fall to the Err(index) case with index > 0, the code should push index-1 (pointing to the key before the search position). The bug pushed index, causing the range to include an extra key beyond the requested end bound.",
+      "mutation_type": "expression",
+      "change_size": 1
+    },
+    {
+      "rank": 2,
+      "id": 2,
+      "hash": "1e8c3e44",
+      "title": "RRB target index lookup if\u2192while",
+      "file": "src/nodes/rrb.rs",
+      "line": 457,
+      "fixed_code": "            while size_table[target_idx] <= index {",
+      "buggy_code": "            if size_table[target_idx] <= index {",
+      "context": "In index_in(), the size table lookup needs to advance past all entries <= index. A single 'if' only skips one entry, but there can be multiple entries (e.g. empty children) that need to be skipped. The 'while' correctly scans until the right child is found.",
+      "mutation_type": "expression",
+      "change_size": 1
+    },
+    {
+      "rank": 3,
+      "id": 4,
+      "hash": "f7449127",
+      "title": "Vector::ptr_eq operator precedence",
+      "file": "src/vector/mod.rs",
+      "sites": [
+        {
+          "label": "ptr_eq",
+          "line": 371,
+          "fixed_code": "                    && ((left.middle.is_empty() && right.middle.is_empty())\n                        || Ref::ptr_eq(&left.middle, &right.middle))",
+          "buggy_code": "                    && (left.middle.is_empty() && right.middle.is_empty())\n                    || Ref::ptr_eq(&left.middle, &right.middle)"
+        },
+        {
+          "label": "PartialEq",
+          "line": 1756,
+          "fixed_code": "                    && ((left.middle.is_empty() && right.middle.is_empty())\n                        || Ref::ptr_eq(&left.middle, &right.middle))",
+          "buggy_code": "                    && (left.middle.is_empty() && right.middle.is_empty())\n                    || Ref::ptr_eq(&left.middle, &right.middle)"
+        }
+      ],
+      "context": "Without the outer parens, || has lower precedence than &&, so 'a && b && (c && d) || e' becomes '(a && b && c && d) || e'. This means ptr_eq alone could make the entire expression true, even if outer/inner chunks don't match.",
+      "mutation_type": "expression",
+      "change_size": 2
+    },
+    {
+      "rank": 4,
+      "id": 3,
+      "hash": "bdd4144c",
+      "title": "Sort variable declared outside loop",
+      "file": "src/sort.rs",
+      "line": 92,
+      "fixed_code": "    while less_position != less_focus.len() || greater_position != greater_focus.len() {\n        // At start of this loop, equal_position always points to an equal item\n        let mut equal_swap_side = None;",
+      "buggy_code": "    let mut equal_swap_side = None;\n\n    while less_position != less_focus.len() || greater_position != greater_focus.len() {\n        // At start of this loop, equal_position always points to an equal item",
+      "context": "The variable 'equal_swap_side' must be reset to None at the start of each loop iteration. When declared outside the loop, stale values from the previous iteration leak into the next, causing incorrect swap decisions in the 3-way partition.",
+      "mutation_type": "statement",
+      "change_size": 2
+    },
+    {
+      "rank": 5,
+      "id": 11,
+      "hash": "1209e823",
+      "title": "RRB size table: side-effect in debug_assert",
+      "file": "src/nodes/rrb.rs",
+      "line": 110,
+      "fixed_code": "                        let first = size_table.pop_front();\n                        debug_assert_eq!(value, first);",
+      "buggy_code": "                        debug_assert_eq!(value, size_table.pop_front());",
+      "context": "pop_front() is a side effect that removes the first element. Inside debug_assert_eq!, it only executes in debug builds. In release builds, the pop never happens, leaving the size table corrupted with an extra entry.",
+      "mutation_type": "expression",
+      "change_size": 2
+    },
+    {
+      "rank": 6,
+      "id": 5,
+      "hash": "005193a2",
+      "title": "Vector::eq incomplete for single chunks",
+      "file": "src/vector/mod.rs",
+      "line": 1741,
+      "fixed_code": "            (Single(_, left), Single(_, right)) => {\n                if cmp_chunk(left, right) {\n                    return true;\n                }\n                self.iter().eq(other.iter())\n            }",
+      "buggy_code": "            (Single(_, left), Single(_, right)) => cmp_chunk(left, right),",
+      "context": "cmp_chunk compares chunk internals (pointer equality or direct comparison), but for single-element vectors with different chunk representations of the same data, it can return false. The fix adds a fallback to element-by-element comparison via iterators.",
+      "mutation_type": "statement",
+      "change_size": 5
+    },
+    {
+      "rank": 7,
+      "id": 6,
+      "hash": "cf08eec9",
+      "title": "Btree removal: wrong PullUp vs Steal priority",
+      "file": "src/nodes/btree.rs",
+      "line": 678,
+      "fixed_code": "                    (&Some(ref left), &Some(ref right)) => {\n                        if !left.too_small() {\n                            RemoveAction::PullUp(Boundary::Highest, index, index)\n                        } else if !right.too_small() {\n                            RemoveAction::PullUp(Boundary::Lowest, index, index + 1)\n                        } else {\n                            RemoveAction::Merge(index)\n                        }\n                    }",
+      "buggy_code": "                    (&Some(ref left), &Some(ref right)) => {\n                        if left.has_room() && !right.too_small() {\n                            RemoveAction::StealFromRight(index)\n                        } else if right.has_room() && !left.too_small() {\n                            RemoveAction::StealFromLeft(index + 1)\n                        } else {\n                            RemoveAction::Merge(index)\n                        }\n                    }",
+      "context": "When removing a key from a btree node with both children present, the code must first try to pull a predecessor/successor from a non-small child before attempting to steal. The old code tried stealing first, which could corrupt the tree structure when neither child was too small."
+    }
+  ]
+}

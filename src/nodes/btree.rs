@@ -394,6 +394,7 @@ impl<A: BTreeValue> Node<A> {
                         path.push((self, index));
                         path
                     }
+                    /*| path_next_backtrack [btree, iterator, missing-backtrack] */
                     None => {
                         // go back up to find next
                         while let Some((node, idx)) = path.last() {
@@ -404,7 +405,14 @@ impl<A: BTreeValue> Node<A> {
                             }
                         }
                         path
-                    }
+                    },
+                    /*|| path_next_backtrack_1 */
+                    /*|
+                    None => {
+                        Vec::new()
+                    },
+                    */
+                    /* |*/
                 },
                 Some(ref node) => {
                     path.push((self, index));
@@ -446,7 +454,13 @@ impl<A: BTreeValue> Node<A> {
                     path
                 }
                 None => {
+                    /*| range_off_by_one [btree, range, off-by-one, issue-143] */
                     path.push((self, index - 1));
+                    /*|| range_off_by_one_1 */
+                    /*|
+                    path.push((self, index));
+                    */
+                    /* |*/
                     path
                 }
                 Some(ref node) => {
@@ -683,7 +697,7 @@ impl<A: BTreeValue> Node<A> {
                         } else {
                             RemoveAction::Merge(index)
                         }
-                    }
+                    },
                     _ => unreachable!("Branch missing children"),
                 }
             }

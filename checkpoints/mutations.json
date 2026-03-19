@@ -1,0 +1,130 @@
+{
+  "project": "im-rs",
+  "repo": "https://github.com/bodil/im-rs",
+  "language": "Rust",
+  "total_mutations": 6,
+  "mutations": [
+    {
+      "name": "path_next_backtrack",
+      "file": "src/nodes/btree.rs",
+      "line": 397,
+      "variant": "path_next_backtrack_1",
+      "tags": [
+        "btree",
+        "iterator",
+        "missing-backtrack"
+      ],
+      "bug_type": "missing-backtrack",
+      "description": "path_next returns Vec::new() instead of backtracking up the path when reaching end of a node",
+      "source_commit": "41d99725",
+      "test_mode": "debug",
+      "failing_tests": [
+        "ord::map::test::range_iter_big"
+      ]
+    },
+    {
+      "name": "range_off_by_one",
+      "file": "src/nodes/btree.rs",
+      "line": 457,
+      "variant": "range_off_by_one_1",
+      "tags": [
+        "btree",
+        "range",
+        "off-by-one",
+        "issue-143"
+      ],
+      "bug_type": "off-by-one",
+      "description": "Off-by-one in BTreeMap range iterator: uses index instead of index-1 when pushing to path",
+      "source_commit": "c0609ceb",
+      "source_issue": "https://github.com/bodil/im-rs/issues/143",
+      "test_mode": "debug",
+      "failing_tests": [
+        "ord::map::test::range_iter_big",
+        "ord::map::test::ranged_iter"
+      ]
+    },
+    {
+      "name": "rrb_debug_pop",
+      "file": "src/nodes/rrb.rs",
+      "line": 110,
+      "variant": "rrb_debug_pop_1",
+      "tags": [
+        "rrb",
+        "debug-assert",
+        "side-effect",
+        "issue-72"
+      ],
+      "bug_type": "side-effect-in-assertion",
+      "description": "Side effect (pop_front) placed inside debug_assert_eq macro, elided in release builds",
+      "source_commit": "e7296d20",
+      "source_issue": "https://github.com/bodil/im-rs/issues/72",
+      "test_mode": "release",
+      "failing_tests": [
+        "crash (SIGABRT)"
+      ]
+    },
+    {
+      "name": "rrb_density_check",
+      "file": "src/nodes/rrb.rs",
+      "line": 281,
+      "variant": "rrb_density_check_1",
+      "tags": [
+        "rrb",
+        "density",
+        "wrong-predicate"
+      ],
+      "bug_type": "wrong-predicate",
+      "description": "Uses is_full() instead of is_completely_dense(level-1) in parent() \u2014 misclassifies full-but-sparse subtrees as dense, causing wrong Size tracking and index lookup failures",
+      "source_commit": "cb431a6",
+      "test_mode": "debug",
+      "failing_tests": [
+        "vector::test::rrb_density_check_append"
+      ]
+    },
+    {
+      "name": "ptr_eq_precedence",
+      "file": "src/vector/mod.rs",
+      "line": 367,
+      "variant": "ptr_eq_precedence_1",
+      "tags": [
+        "vector",
+        "ptr_eq",
+        "precedence",
+        "issue-131"
+      ],
+      "bug_type": "operator-precedence",
+      "description": "Missing parentheses in ptr_eq check: && (a && b) || c instead of && ((a && b) || c)",
+      "source_commit": "5b37de72",
+      "source_issue": "https://github.com/bodil/im-rs/issues/131",
+      "test_mode": "debug",
+      "failing_tests": [
+        "vector::test::issue_131",
+        "vector::test::ptr_eq"
+      ]
+    },
+    {
+      "name": "eq_single_chunk",
+      "file": "src/vector/mod.rs",
+      "line": 1752,
+      "variant": "eq_single_chunk_1",
+      "tags": [
+        "vector",
+        "equality",
+        "missing-fallback"
+      ],
+      "bug_type": "missing-fallback",
+      "description": "PartialEq single-chunk optimization returns cmp_chunk result directly, bypassing iterator fallback",
+      "source_commit": "5b37de72",
+      "test_mode": "debug",
+      "failing_tests": [
+        "lib_test::update_in",
+        "ser::test::ser_vector",
+        "tests::vector::comprehensive",
+        "vector::test::chunks",
+        "vector::test::iter_mut",
+        "vector::test::focus",
+        "vector::test::chunks_mut"
+      ]
+    }
+  ]
+}

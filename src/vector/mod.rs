@@ -364,12 +364,23 @@ impl<A: Clone> Vector<A> {
         match (&self.vector, &other.vector) {
             (Single(_, left), Single(_, right)) => cmp_chunk(left, right),
             (Full(_, left), Full(_, right)) => {
+                /*| ptr_eq_precedence [vector, ptr_eq, precedence, issue-131] */
                 cmp_chunk(&left.outer_f, &right.outer_f)
                     && cmp_chunk(&left.inner_f, &right.inner_f)
                     && cmp_chunk(&left.inner_b, &right.inner_b)
                     && cmp_chunk(&left.outer_b, &right.outer_b)
                     && ((left.middle.is_empty() && right.middle.is_empty())
                         || Ref::ptr_eq(&left.middle, &right.middle))
+                /*|| ptr_eq_precedence_1 */
+                /*|
+                cmp_chunk(&left.outer_f, &right.outer_f)
+                    && cmp_chunk(&left.inner_f, &right.inner_f)
+                    && cmp_chunk(&left.inner_b, &right.inner_b)
+                    && cmp_chunk(&left.outer_b, &right.outer_b)
+                    && (left.middle.is_empty() && right.middle.is_empty())
+                    || Ref::ptr_eq(&left.middle, &right.middle)
+                */
+                /* |*/
             }
             _ => false,
         }
@@ -1738,12 +1749,20 @@ impl<A: Clone + Eq> PartialEq for Vector<A> {
         }
 
         match (&self.vector, &other.vector) {
+            /*| eq_single_chunk [vector, equality, missing-fallback] */
             (Single(_, left), Single(_, right)) => {
                 if cmp_chunk(left, right) {
                     return true;
                 }
                 self.iter().eq(other.iter())
-            }
+            },
+            /*|| eq_single_chunk_1 */
+            /*|
+            (Single(_, left), Single(_, right)) => {
+                cmp_chunk(left, right)
+            },
+            */
+            /* |*/
             (Full(_, left), Full(_, right)) => {
                 if left.length != right.length {
                     return false;
@@ -2527,6 +2546,43 @@ mod test {
             assert_ne!(inp2.get(len - 1), input.get(len - 1));
             assert!(!input.ptr_eq(&inp2));
         }
+    }
+
+    fn verify_indices(v: &Vector<i32>) {
+        let collected: Vec<_> = v.iter().cloned().collect();
+        assert_eq!(collected.len(), v.len());
+        for (i, expected) in collected.iter().enumerate() {
+            assert_eq!(
+                Some(expected),
+                v.get(i),
+                "mismatch at index {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn rrb_density_check_append() {
+        // The density check bug (is_full vs is_completely_dense) only
+        // triggers in parent() at level ≥ 2, needing level-1 children
+        // that are full (64 children) but not completely dense.
+        // Build a 270K element tree, create sparse leaves, then
+        // split and re-append to trigger merge_rebalance at level ≥ 2.
+        use crate::nodes::rrb::NODE_SIZE;
+        let total = NODE_SIZE * NODE_SIZE * CHUNK_SIZE + CHUNK_SIZE * 10;
+        let mut v: Vector<i32> = (0..total as i32).collect();
+        // Remove scattered elements to create sparse leaves
+        for i in (0..200).rev() {
+            let idx = (i * (total / 200)) + 7;
+            if idx < v.len() {
+                v.remove(idx);
+            }
+        }
+        // Split and re-append triggers merge_rebalance at high levels
+        let split = v.len() / 3;
+        let (left, right) = v.split_at(split);
+        let mut result = left;
+        result.append(right);
+        verify_indices(&result);
     }
 
     proptest! {

@@ -14,3 +14,6 @@ cc e62da794bbaf569bec601c6ce85d8ca80d85b726d10347a487524807c76e9e9a # shrinks to
 cc 6bb8dfa5f2a1b8c2e7cbd18e81b31724ea1e121e84061ee6fa6a8ad7ed62fbe2 # shrinks to ref input = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 cc a2ce9c3a2234cbda6bcf2e0d84a3c3e607d730def32a5dfff59b9c680a18b5af # shrinks to ref mut input_src = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 cc bc29377410935c0e4cd1d3a56cb6e5ccc8bb23ca1fc7e11dae15e57066482739 # shrinks to ref input = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+cc f628938342ec26806a0dd1bcbc3d44959c59e720210e2513f05326d0148c3033 # shrinks to ref input = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+cc ba53494f7faa703ea452f6c05ea56cea4ef605ebe5768109f7605f8b6aa94a42 # shrinks to ref input = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+cc 9f970d2b69502d6714bc53f8a1c927bc8eac6e08bfd040a7bcafeb0efbcdc198 # shrinks to ref mut input_src = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]

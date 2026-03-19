@@ -1,0 +1,60 @@
+{
+  "project": "im-rs",
+  "repo": "https://github.com/bodil/im-rs",
+  "language": "Rust",
+  "summary": {
+    "commits_scanned": 50,
+    "candidates_identified": 13,
+    "mutations_injected": 8,
+    "mutations_tested": 7,
+    "mutations_detected": 4,
+    "mutations_undetected": 3,
+    "mutations_removed": 4,
+    "mutations_final": 4,
+    "base_tests_total": 115,
+    "base_tests_passing": 115
+  },
+  "pipeline_stages": {
+    "candidates": "checkpoints/candidates.json",
+    "ranked": "checkpoints/ranked.json",
+    "fixes": "checkpoints/fixes.json",
+    "classified": "checkpoints/classified.json",
+    "tests": "checkpoints/tests.json",
+    "mutations": "checkpoints/mutations.json"
+  },
+  "final_mutations": [
+    {
+      "name": "range_off_by_one",
+      "file": "src/nodes/btree.rs:449",
+      "bug_type": "off-by-one",
+      "issue": "#143",
+      "failing_tests": 2
+    },
+    {
+      "name": "rrb_debug_pop",
+      "file": "src/nodes/rrb.rs:110",
+      "bug_type": "side-effect-in-assertion",
+      "issue": "#72",
+      "note": "release mode only"
+    },
+    {
+      "name": "ptr_eq_precedence",
+      "file": "src/vector/mod.rs:367",
+      "bug_type": "operator-precedence",
+      "issue": "#131",
+      "failing_tests": 2
+    },
+    {
+      "name": "eq_single_chunk",
+      "file": "src/vector/mod.rs:1752",
+      "bug_type": "missing-fallback",
+      "failing_tests": 7
+    }
+  ],
+  "notes": [
+    "rrb_debug_pop only detectable in release mode (debug_assert elided)",
+    "3 mutations removed: remove_action_priority (equivalent), rrb_index_lookup (undetectable), eq_precedence (weak coverage)",
+    "1 mutation removed: sort_var_scope (incompatible with functional syntax - variable scope mutation)",
+    "All mutations derived from real historical bugs in im-rs git history"
+  ]
+}

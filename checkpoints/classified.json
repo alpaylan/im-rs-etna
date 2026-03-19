@@ -1,0 +1,113 @@
+{
+  "mutations": [
+    {
+      "name": "range_off_by_one",
+      "file": "src/nodes/btree.rs",
+      "line": 449,
+      "variant": "range_off_by_one_1",
+      "tags": [
+        "btree",
+        "range",
+        "off-by-one",
+        "issue-143"
+      ],
+      "bug_type": "off-by-one",
+      "description": "Off-by-one in BTreeMap range iterator: path.push((self, index)) instead of path.push((self, index - 1))",
+      "source_commit": "c0609ceb",
+      "source_issue": "https://github.com/bodil/im-rs/issues/143",
+      "detected_by_tests": true,
+      "failing_tests": [
+        "ord::map::test::range_iter_big",
+        "ord::map::test::ranged_iter"
+      ],
+      "test_mode": "debug"
+    },
+    {
+      "name": "rrb_debug_pop",
+      "file": "src/nodes/rrb.rs",
+      "line": 110,
+      "variant": "rrb_debug_pop_1",
+      "tags": [
+        "rrb",
+        "debug-assert",
+        "side-effect",
+        "issue-72"
+      ],
+      "bug_type": "side-effect-in-assertion",
+      "description": "Side effect (pop_front) inside debug_assert_eq, disappears in release builds",
+      "source_commit": "e7296d20",
+      "source_issue": "https://github.com/bodil/im-rs/issues/72",
+      "detected_by_tests": true,
+      "failing_tests": [
+        "crash (SIGABRT)"
+      ],
+      "test_mode": "release"
+    },
+    {
+      "name": "ptr_eq_precedence",
+      "file": "src/vector/mod.rs",
+      "line": 367,
+      "variant": "ptr_eq_precedence_1",
+      "tags": [
+        "vector",
+        "ptr_eq",
+        "precedence",
+        "issue-131"
+      ],
+      "bug_type": "operator-precedence",
+      "description": "Missing parentheses in ptr_eq: && (a && b) || c instead of && ((a && b) || c)",
+      "source_commit": "5b37de72",
+      "source_issue": "https://github.com/bodil/im-rs/issues/131",
+      "detected_by_tests": true,
+      "failing_tests": [
+        "vector::test::issue_131",
+        "vector::test::ptr_eq"
+      ],
+      "test_mode": "debug"
+    },
+    {
+      "name": "eq_single_chunk",
+      "file": "src/vector/mod.rs",
+      "line": 1752,
+      "variant": "eq_single_chunk_1",
+      "tags": [
+        "vector",
+        "equality",
+        "missing-fallback"
+      ],
+      "bug_type": "missing-fallback",
+      "description": "Missing iterator fallback in PartialEq for single-chunk case",
+      "source_commit": "5b37de72",
+      "source_issue": null,
+      "detected_by_tests": true,
+      "failing_tests": [
+        "lib_test::update_in",
+        "ser::test::ser_vector",
+        "tests::vector::comprehensive",
+        "vector::test::chunks",
+        "vector::test::iter_mut",
+        "vector::test::focus",
+        "vector::test::chunks_mut"
+      ],
+      "test_mode": "debug"
+    }
+  ],
+  "removed_mutations": [
+    {
+      "name": "remove_action_priority",
+      "reason": "Not detectable: both priority orderings produce valid B-trees"
+    },
+    {
+      "name": "rrb_index_lookup",
+      "reason": "Not detectable: existing tests need complex RRB trees"
+    },
+    {
+      "name": "eq_precedence",
+      "reason": "Not detectable: weak PartialEq test coverage"
+    },
+    {
+      "name": "sort_var_scope",
+      "reason": "Incompatible with functional syntax: variable scope mutation"
+    }
+  ]
+}
