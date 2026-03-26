@@ -5,7 +5,7 @@ This workload contains 6 bugs derived from real historical fixes in
 library for Rust featuring `Vector` (RRB tree), `HashMap` (HAMT), and
 `OrdMap` (B-tree).
 
-Each bug is injected using [marauders](https://github.com/akeles/marauders)
+Each bug is injected using [marauders](http://github.com/alpaylan/marauders)
 comment syntax. In the base (default) configuration all code is correct and
 all 115 tests pass. Activating a variant via `M_<variant>=active` introduces
 the historical bug.
@@ -41,14 +41,14 @@ Bugs that were investigated but excluded:
 
 ## Bug 1: `path_next_backtrack`
 
-| | |
-|---|---|
-| **File** | `src/nodes/btree.rs:397` |
-| **Variant** | `path_next_backtrack_1` |
-| **Tags** | `btree`, `iterator`, `missing-backtrack` |
-| **Fix commit** | `41d99725` |
-| **Type** | Missing backtrack logic |
-| **Test mode** | debug |
+|                |                                          |
+| -------------- | ---------------------------------------- |
+| **File**       | `src/nodes/btree.rs:397`                 |
+| **Variant**    | `path_next_backtrack_1`                  |
+| **Tags**       | `btree`, `iterator`, `missing-backtrack` |
+| **Fix commit** | `41d99725`                               |
+| **Type**       | Missing backtrack logic                  |
+| **Test mode**  | debug                                    |
 
 ### Description
 
@@ -101,15 +101,15 @@ assert_eq!(range.len(), 100); // fails with bug: returns fewer elements
 
 ## Bug 2: `range_off_by_one`
 
-| | |
-|---|---|
-| **File** | `src/nodes/btree.rs:457` |
-| **Variant** | `range_off_by_one_1` |
-| **Tags** | `btree`, `range`, `off-by-one`, `issue-143` |
-| **Fix commit** | `3f4e01a4` (c0609ceb) |
-| **Issue** | [#143](https://github.com/bodil/im-rs/issues/143) |
-| **Type** | Off-by-one |
-| **Test mode** | debug |
+|                |                                                   |
+| -------------- | ------------------------------------------------- |
+| **File**       | `src/nodes/btree.rs:457`                          |
+| **Variant**    | `range_off_by_one_1`                              |
+| **Tags**       | `btree`, `range`, `off-by-one`, `issue-143`       |
+| **Fix commit** | `3f4e01a4` (c0609ceb)                             |
+| **Issue**      | [#143](https://github.com/bodil/im-rs/issues/143) |
+| **Type**       | Off-by-one                                        |
+| **Test mode**  | debug                                             |
 
 ### Description
 
@@ -153,15 +153,15 @@ assert!(range.last().map(|(k, _)| **k).unwrap_or(0) <= 500);
 
 ## Bug 3: `rrb_debug_pop`
 
-| | |
-|---|---|
-| **File** | `src/nodes/rrb.rs:110` |
-| **Variant** | `rrb_debug_pop_1` |
-| **Tags** | `rrb`, `debug-assert`, `side-effect`, `issue-72` |
-| **Fix commit** | `1209e823` (e7296d20) |
-| **Issue** | [#72](https://github.com/bodil/im-rs/issues/72) |
-| **Type** | Side effect inside debug assertion |
-| **Test mode** | release (`--release`) |
+|                |                                                  |
+| -------------- | ------------------------------------------------ |
+| **File**       | `src/nodes/rrb.rs:110`                           |
+| **Variant**    | `rrb_debug_pop_1`                                |
+| **Tags**       | `rrb`, `debug-assert`, `side-effect`, `issue-72` |
+| **Fix commit** | `1209e823` (e7296d20)                            |
+| **Issue**      | [#72](https://github.com/bodil/im-rs/issues/72)  |
+| **Type**       | Side effect inside debug assertion               |
+| **Test mode**  | release (`--release`)                            |
 
 ### Description
 
@@ -217,15 +217,15 @@ for _ in 0..5000 {
 
 ## Bug 4: `rrb_density_check`
 
-| | |
-|---|---|
-| **File** | `src/nodes/rrb.rs:281` |
-| **Variant** | `rrb_density_check_1` |
-| **Tags** | `rrb`, `density`, `wrong-predicate` |
-| **Fix commit** | `cb431a6` |
-| **Issue** | [#55](https://github.com/bodil/im-rs/issues/55) (closes) |
-| **Type** | Wrong predicate |
-| **Test mode** | debug |
+|                |                                                          |
+| -------------- | -------------------------------------------------------- |
+| **File**       | `src/nodes/rrb.rs:281`                                   |
+| **Variant**    | `rrb_density_check_1`                                    |
+| **Tags**       | `rrb`, `density`, `wrong-predicate`                      |
+| **Fix commit** | `cb431a6`                                                |
+| **Issue**      | [#55](https://github.com/bodil/im-rs/issues/55) (closes) |
+| **Type**       | Wrong predicate                                          |
+| **Test mode**  | debug                                                    |
 
 ### Description
 
@@ -302,15 +302,15 @@ for (i, expected) in collected.iter().enumerate() {
 
 ## Bug 5: `ptr_eq_precedence`
 
-| | |
-|---|---|
-| **File** | `src/vector/mod.rs:367` |
-| **Variant** | `ptr_eq_precedence_1` |
-| **Tags** | `vector`, `ptr_eq`, `precedence`, `issue-131` |
-| **Fix commit** | `f744912` |
-| **Issue** | [#131](https://github.com/bodil/im-rs/issues/131) |
-| **Type** | Operator precedence |
-| **Test mode** | debug |
+|                |                                                   |
+| -------------- | ------------------------------------------------- |
+| **File**       | `src/vector/mod.rs:367`                           |
+| **Variant**    | `ptr_eq_precedence_1`                             |
+| **Tags**       | `vector`, `ptr_eq`, `precedence`, `issue-131`     |
+| **Fix commit** | `f744912`                                         |
+| **Issue**      | [#131](https://github.com/bodil/im-rs/issues/131) |
+| **Type**       | Operator precedence                               |
+| **Test mode**  | debug                                             |
 
 ### Description
 
@@ -377,14 +377,14 @@ assert!(!a.ptr_eq(&b)); // fails with bug
 
 ## Bug 6: `eq_single_chunk`
 
-| | |
-|---|---|
-| **File** | `src/vector/mod.rs:1752` |
-| **Variant** | `eq_single_chunk_1` |
-| **Tags** | `vector`, `equality`, `missing-fallback` |
-| **Fix commit** | `005193a` |
-| **Type** | Missing fallback |
-| **Test mode** | debug |
+|                |                                          |
+| -------------- | ---------------------------------------- |
+| **File**       | `src/vector/mod.rs:1752`                 |
+| **Variant**    | `eq_single_chunk_1`                      |
+| **Tags**       | `vector`, `equality`, `missing-fallback` |
+| **Fix commit** | `005193a`                                |
+| **Type**       | Missing fallback                         |
+| **Test mode**  | debug                                    |
 
 ### Description
 
