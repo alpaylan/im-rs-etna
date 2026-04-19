@@ -94,7 +94,7 @@ fn check_ptr_eq_precedence() -> Result<(), String> {
 }
 
 fn check_eq_single_chunk() -> Result<(), String> {
-    to_err(property_eq_single_chunk(vec![1, 2, 3]))
+    to_err(property_eq_single_chunk((0..40).collect()))
 }
 
 // ---------- etna (deterministic witness replay) ----------
@@ -344,19 +344,6 @@ fn run_quickcheck_property(property: &str) -> Outcome {
 
 static CC_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-fn cc_path_next_backtrack((n, lo, span): (usize, usize, usize)) -> Option<bool> {
-    CC_COUNTER.fetch_add(1, Ordering::Relaxed);
-    match property_path_next_backtrack(
-        (n as u32).wrapping_mul(17),
-        (lo as u32).wrapping_mul(13),
-        (span as u32).wrapping_mul(11),
-    ) {
-        PropertyResult::Pass => Some(true),
-        PropertyResult::Fail(_) => Some(false),
-        PropertyResult::Discard => None,
-    }
-}
-
 fn cc_range_off_by_one((n, hi): (usize, usize)) -> Option<bool> {
     CC_COUNTER.fetch_add(1, Ordering::Relaxed);
     match property_range_off_by_one((n as u32).wrapping_mul(17), (hi as u32).wrapping_mul(13)) {
@@ -369,15 +356,6 @@ fn cc_range_off_by_one((n, hi): (usize, usize)) -> Option<bool> {
 fn cc_rrb_debug_pop(n: usize) -> Option<bool> {
     CC_COUNTER.fetch_add(1, Ordering::Relaxed);
     match property_rrb_debug_pop((n as u32).wrapping_mul(31)) {
-        PropertyResult::Pass => Some(true),
-        PropertyResult::Fail(_) => Some(false),
-        PropertyResult::Discard => None,
-    }
-}
-
-fn cc_rrb_density_check(n: usize) -> Option<bool> {
-    CC_COUNTER.fetch_add(1, Ordering::Relaxed);
-    match property_rrb_density_check(n as u32) {
         PropertyResult::Pass => Some(true),
         PropertyResult::Fail(_) => Some(false),
         PropertyResult::Discard => None,
@@ -402,6 +380,51 @@ fn cc_eq_single_chunk(xs: Vec<i32>) -> Option<bool> {
     }
 }
 
+// Seeded single-argument variants for bounded runs.
+fn cc_path_next_backtrack_seeded(seed: u32) -> Option<bool> {
+    CC_COUNTER.fetch_add(1, Ordering::Relaxed);
+    match property_path_next_backtrack(seed, seed.wrapping_mul(13), seed.wrapping_mul(11) + 1) {
+        PropertyResult::Pass => Some(true),
+        PropertyResult::Fail(_) => Some(false),
+        PropertyResult::Discard => None,
+    }
+}
+
+fn cc_rrb_density_check_seeded(seed: u32) -> Option<bool> {
+    CC_COUNTER.fetch_add(1, Ordering::Relaxed);
+    match property_rrb_density_check(seed) {
+        PropertyResult::Pass => Some(true),
+        PropertyResult::Fail(_) => Some(false),
+        PropertyResult::Discard => None,
+    }
+}
+
+// Bounded-iteration driver for properties too expensive to run 20k times.
+fn cc_run_bounded(n: u32, f: fn(u32) -> Option<bool>) -> crabcheck_qc::RunResult {
+    let mut passed: u64 = 0;
+    let mut discarded: u64 = 0;
+    for seed in 0..n {
+        match f(seed) {
+            Some(true) => passed += 1,
+            Some(false) => {
+                return crabcheck_qc::RunResult {
+                    passed,
+                    discarded,
+                    status: crabcheck_qc::ResultStatus::Failed {
+                        arguments: vec![format!("{seed}")],
+                    },
+                };
+            }
+            None => discarded += 1,
+        }
+    }
+    crabcheck_qc::RunResult {
+        passed,
+        discarded,
+        status: crabcheck_qc::ResultStatus::Finished,
+    }
+}
+
 fn run_crabcheck_property(property: &str) -> Outcome {
     if property == "All" {
         return run_all(run_crabcheck_property);
@@ -409,10 +432,14 @@ fn run_crabcheck_property(property: &str) -> Outcome {
     CC_COUNTER.store(0, Ordering::Relaxed);
     let t0 = Instant::now();
     let result = match property {
-        "PathNextBacktrack" => crabcheck_qc::quickcheck(cc_path_next_backtrack),
+        // Build a 20480-entry OrdMap and sweep ~640 range queries per call;
+        // 20k cases is ~5 min. Cap to 32 to keep full runs responsive.
+        "PathNextBacktrack" => cc_run_bounded(32, cc_path_next_backtrack_seeded),
         "RangeOffByOne" => crabcheck_qc::quickcheck(cc_range_off_by_one),
         "RrbDebugPop" => crabcheck_qc::quickcheck(cc_rrb_debug_pop),
-        "RrbDensityCheck" => crabcheck_qc::quickcheck(cc_rrb_density_check),
+        // RrbDensityCheck's property allocates a 262k-element Vector per call;
+        // running 20k cases would take hours. Cap to 4.
+        "RrbDensityCheck" => cc_run_bounded(4, cc_rrb_density_check_seeded),
         "PtrEqPrecedence" => crabcheck_qc::quickcheck(cc_ptr_eq_precedence),
         "EqSingleChunk" => crabcheck_qc::quickcheck(cc_eq_single_chunk),
         _ => {
@@ -466,7 +493,7 @@ fn run_hegel_property(property: &str) -> Outcome {
                 let lo = tc.draw(hgen::integers::<u16>()) as u32;
                 let span = tc.draw(hgen::integers::<u16>()) as u32;
                 if let PropertyResult::Fail(m) = property_path_next_backtrack(n, lo, span) {
-                    panic!("{m}");
+                    panic!("{}", m);
                 }
             })
             .settings(settings.clone())
@@ -478,7 +505,7 @@ fn run_hegel_property(property: &str) -> Outcome {
                 let n = tc.draw(hgen::integers::<u16>()) as u32;
                 let hi = tc.draw(hgen::integers::<u16>()) as u32;
                 if let PropertyResult::Fail(m) = property_range_off_by_one(n, hi) {
-                    panic!("{m}");
+                    panic!("{}", m);
                 }
             })
             .settings(settings.clone())
@@ -489,7 +516,7 @@ fn run_hegel_property(property: &str) -> Outcome {
                 HG_COUNTER.fetch_add(1, Ordering::Relaxed);
                 let n = tc.draw(hgen::integers::<u16>()) as u32;
                 if let PropertyResult::Fail(m) = property_rrb_debug_pop(n) {
-                    panic!("{m}");
+                    panic!("{}", m);
                 }
             })
             .settings(settings.clone())
@@ -501,7 +528,7 @@ fn run_hegel_property(property: &str) -> Outcome {
                 HG_COUNTER.fetch_add(1, Ordering::Relaxed);
                 let n = tc.draw(hgen::integers::<u8>()) as u32;
                 if let PropertyResult::Fail(m) = property_rrb_density_check(n) {
-                    panic!("{m}");
+                    panic!("{}", m);
                 }
             })
             .settings(HegelSettings::new().test_cases(4).seed(Some(0xF100_A7)))
@@ -513,7 +540,7 @@ fn run_hegel_property(property: &str) -> Outcome {
                 let n = tc.draw(hgen::integers::<u16>()) as u32;
                 let slot = tc.draw(hgen::integers::<u16>()) as u32;
                 if let PropertyResult::Fail(m) = property_ptr_eq_precedence(n, slot) {
-                    panic!("{m}");
+                    panic!("{}", m);
                 }
             })
             .settings(settings.clone())
@@ -525,13 +552,13 @@ fn run_hegel_property(property: &str) -> Outcome {
                 let len = (tc.draw(hgen::integers::<u8>()) % 32 + 1) as usize;
                 let xs: Vec<i32> = (0..len).map(|_| tc.draw(hgen::integers::<i32>())).collect();
                 if let PropertyResult::Fail(m) = property_eq_single_chunk(xs) {
-                    panic!("{m}");
+                    panic!("{}", m);
                 }
             })
             .settings(settings.clone())
             .run();
         }
-        _ => panic!("__unknown_property:{property}"),
+        _ => panic!("{}", format!("__unknown_property:{}", property)),
     }));
     let elapsed_us = t0.elapsed().as_micros();
     let inputs = HG_COUNTER.load(Ordering::Relaxed);

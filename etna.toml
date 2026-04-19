@@ -1,0 +1,82 @@
+# ETNA workload index for im-rs.
+#
+# One [[variant]] per injected mutation. Source of truth for variant->property
+# mapping. Every other fact is derivable from the source tree:
+#   - ls patches/*.patch                          (patch-based variants)
+#   - grep -rn "pub fn property_" src/etna.rs     (property functions)
+#   - grep -rn "fn witness_.*_case_" tests/       (witness tests)
+#
+# Base commit for this workload is HEAD of master on this tree. Every
+# etna/<variant> branch is master + exactly one patch applied on top.
+
+[[variant]]
+name = "path_next_backtrack_41d99725_1"
+property = "path_next_backtrack"
+injection = "patch"
+patch = "patches/path_next_backtrack_41d99725_1.patch"
+source_commit = "41d9972538d49ffa3964e3a94109619ce053ef36"
+witnesses = [
+    "witness_path_next_backtrack_case_ordmap_1000",
+]
+frameworks = ["proptest", "quickcheck", "crabcheck", "hegel"]
+files = ["src/nodes/btree.rs"]
+
+[[variant]]
+name = "range_off_by_one_3f4e01a4_1"
+property = "range_off_by_one"
+injection = "patch"
+patch = "patches/range_off_by_one_3f4e01a4_1.patch"
+source_commit = "3f4e01a43254fe228d1ce64e47dfaf4edc8f4f19"
+witnesses = [
+    "witness_range_off_by_one_case_odd_upper_bound",
+]
+frameworks = ["proptest", "quickcheck", "crabcheck", "hegel"]
+files = ["src/nodes/btree.rs"]
+
+[[variant]]
+name = "rrb_debug_pop_1209e823_1"
+property = "rrb_debug_pop"
+injection = "patch"
+patch = "patches/rrb_debug_pop_1209e823_1.patch"
+source_commit = "1209e823b633c7ac73ae686896382b7207a907ac"
+witnesses = [
+    "witness_rrb_debug_pop_case_release_pop_front",
+]
+frameworks = ["proptest", "quickcheck", "crabcheck", "hegel"]
+files = ["src/nodes/rrb.rs"]
+
+[[variant]]
+name = "rrb_density_check_cb431a6_1"
+property = "rrb_density_check"
+injection = "patch"
+patch = "patches/rrb_density_check_cb431a6_1.patch"
+source_commit = "cb431a612a39fb7973f7a7218771b5b3fd43d979"
+witnesses = [
+    "witness_rrb_density_check_case_level2_rrb",
+]
+frameworks = ["proptest", "quickcheck", "crabcheck", "hegel"]
+files = ["src/nodes/rrb.rs"]
+
+[[variant]]
+name = "ptr_eq_precedence_f744912_1"
+property = "ptr_eq_precedence"
+injection = "patch"
+patch = "patches/ptr_eq_precedence_f744912_1.patch"
+source_commit = "f7449127b83327b82d82690e8333c552014149c8"
+witnesses = [
+    "witness_ptr_eq_precedence_case_diverged_outer",
+]
+frameworks = ["proptest", "quickcheck", "crabcheck", "hegel"]
+files = ["src/vector/mod.rs"]
+
+[[variant]]
+name = "eq_single_chunk_005193a_1"
+property = "eq_single_chunk"
+injection = "patch"
+patch = "patches/eq_single_chunk_005193a_1.patch"
+source_commit = "005193a268e4e9939a50eff0fe6e4f232a1facf4"
+witnesses = [
+    "witness_eq_single_chunk_case_small_vec",
+]
+frameworks = ["proptest", "quickcheck", "crabcheck", "hegel"]
+files = ["src/vector/mod.rs"]
