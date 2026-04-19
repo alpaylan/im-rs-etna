@@ -368,8 +368,8 @@ impl<A: Clone> Vector<A> {
                     && cmp_chunk(&left.inner_f, &right.inner_f)
                     && cmp_chunk(&left.inner_b, &right.inner_b)
                     && cmp_chunk(&left.outer_b, &right.outer_b)
-                    && ((left.middle.is_empty() && right.middle.is_empty())
-                        || Ref::ptr_eq(&left.middle, &right.middle))
+                    && (left.middle.is_empty() && right.middle.is_empty())
+                    || Ref::ptr_eq(&left.middle, &right.middle)
             }
             _ => false,
         }
