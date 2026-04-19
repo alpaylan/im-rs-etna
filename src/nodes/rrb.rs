@@ -107,16 +107,8 @@ impl Size {
                 let size_table = PoolRef::make_mut(pool, size_ref);
                 match side {
                     Left => {
-                        /* marauders:variation=rrb_debug_pop;tags=rrb,debug-assert,side-effect,issue-72 */
-                        match () {
-                            _ if matches!(std::env::var("M_rrb_debug_pop_1").as_deref(), Ok("active")) => {
-                                debug_assert_eq!(value, size_table.pop_front());
-                            },
-                            _ => {
-                                let first = size_table.pop_front();
-                                debug_assert_eq!(value, first);
-                            },
-                        }
+                        let first = size_table.pop_front();
+                        debug_assert_eq!(value, first);
                         for entry in size_table.iter_mut() {
                             *entry -= value;
                         }
@@ -280,26 +272,12 @@ impl<A: Clone> Node<A> {
                 match it.next() {
                     None => break,
                     Some(child) => {
-                        /* marauders:variation=rrb_density_check;tags=rrb,density,wrong-predicate */
-                        match () {
-                            _ if matches!(std::env::var("M_rrb_density_check_1").as_deref(), Ok("active")) => {
-                                if size.is_size()
-                                    && !child.is_full()
-                                    && it.peek().is_some()
-                                {
-                                    size = Size::table_from_size(&pool.size_pool, level, size.size());
-                                }
-                            },
-                            _ => {
-                                if size.is_size()
-                                    && !child.is_completely_dense(level - 1)
-                                    && it.peek().is_some()
-                                {
-                                    size = Size::table_from_size(&pool.size_pool, level, size.size());
-                                }
-                            },
+                        if size.is_size()
+                            && !child.is_completely_dense(level - 1)
+                            && it.peek().is_some()
+                        {
+                            size = Size::table_from_size(&pool.size_pool, level, size.size());
                         }
-
                         size.push(&pool.size_pool, Right, level, child.len())
                     }
                 }

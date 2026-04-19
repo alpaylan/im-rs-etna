@@ -364,25 +364,12 @@ impl<A: Clone> Vector<A> {
         match (&self.vector, &other.vector) {
             (Single(_, left), Single(_, right)) => cmp_chunk(left, right),
             (Full(_, left), Full(_, right)) => {
-                /* marauders:variation=ptr_eq_precedence;tags=vector,ptr_eq,precedence,issue-131 */
-                match () {
-                    _ if matches!(std::env::var("M_ptr_eq_precedence_1").as_deref(), Ok("active")) => {
-                        cmp_chunk(&left.outer_f, &right.outer_f)
-                            && cmp_chunk(&left.inner_f, &right.inner_f)
-                            && cmp_chunk(&left.inner_b, &right.inner_b)
-                            && cmp_chunk(&left.outer_b, &right.outer_b)
-                            && (left.middle.is_empty() && right.middle.is_empty())
-                            || Ref::ptr_eq(&left.middle, &right.middle)
-                    },
-                    _ => {
-                        cmp_chunk(&left.outer_f, &right.outer_f)
-                            && cmp_chunk(&left.inner_f, &right.inner_f)
-                            && cmp_chunk(&left.inner_b, &right.inner_b)
-                            && cmp_chunk(&left.outer_b, &right.outer_b)
-                            && ((left.middle.is_empty() && right.middle.is_empty())
-                                || Ref::ptr_eq(&left.middle, &right.middle))
-                    },
-                }
+                cmp_chunk(&left.outer_f, &right.outer_f)
+                    && cmp_chunk(&left.inner_f, &right.inner_f)
+                    && cmp_chunk(&left.inner_b, &right.inner_b)
+                    && cmp_chunk(&left.outer_b, &right.outer_b)
+                    && ((left.middle.is_empty() && right.middle.is_empty())
+                        || Ref::ptr_eq(&left.middle, &right.middle))
             }
             _ => false,
         }
@@ -1751,16 +1738,12 @@ impl<A: Clone + Eq> PartialEq for Vector<A> {
         }
 
         match (&self.vector, &other.vector) {
-            /* marauders:variation=eq_single_chunk;tags=vector,equality,missing-fallback */
-            (Single(_, left), Single(_, right)) if matches!(std::env::var("M_eq_single_chunk_1").as_deref(), Ok("active")) => {
-                cmp_chunk(left, right)
-            },
             (Single(_, left), Single(_, right)) => {
                 if cmp_chunk(left, right) {
                     return true;
                 }
                 self.iter().eq(other.iter())
-            },
+            }
             (Full(_, left), Full(_, right)) => {
                 if left.length != right.length {
                     return false;

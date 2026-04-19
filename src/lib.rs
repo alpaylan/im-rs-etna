@@ -370,6 +370,9 @@ pub mod iter;
 #[cfg(any(test, feature = "proptest"))]
 pub mod proptest;
 
+#[doc(hidden)]
+pub mod etna;
+
 #[cfg(any(test, feature = "serde"))]
 #[doc(hidden)]
 pub mod ser;

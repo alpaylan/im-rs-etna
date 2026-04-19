@@ -3,3 +3,4 @@ dist/
 **/*.rs.bk
 Cargo.lock
 /im-rc
+.hegel/

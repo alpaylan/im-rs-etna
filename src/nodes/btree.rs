@@ -394,10 +394,6 @@ impl<A: BTreeValue> Node<A> {
                         path.push((self, index));
                         path
                     }
-                    /* marauders:variation=path_next_backtrack;tags=btree,iterator,missing-backtrack */
-                    None if matches!(std::env::var("M_path_next_backtrack_1").as_deref(), Ok("active")) => {
-                        Vec::new()
-                    },
                     None => {
                         // go back up to find next
                         while let Some((node, idx)) = path.last() {
@@ -408,7 +404,7 @@ impl<A: BTreeValue> Node<A> {
                             }
                         }
                         path
-                    },
+                    }
                 },
                 Some(ref node) => {
                     path.push((self, index));
@@ -450,15 +446,7 @@ impl<A: BTreeValue> Node<A> {
                     path
                 }
                 None => {
-                    /* marauders:variation=range_off_by_one;tags=btree,range,off-by-one,issue-143 */
-                    match () {
-                        _ if matches!(std::env::var("M_range_off_by_one_1").as_deref(), Ok("active")) => {
-                            path.push((self, index));
-                        },
-                        _ => {
-                            path.push((self, index - 1));
-                        },
-                    }
+                    path.push((self, index - 1));
                     path
                 }
                 Some(ref node) => {
