@@ -159,32 +159,39 @@ pub fn property_rrb_density_check(n_removed: u32) -> PropertyResult {
     // 64^3 = 262_144; +640 guarantees a full top-level node plus leftovers.
     let total = 64 * 64 * 64 + 640;
     let keep_every = (n_removed % 16 + 1) as usize;
-    let mut v: Vector<i32> = (0..total as i32).collect();
-    for i in (0..200).rev() {
-        let idx = (i * (total / 200)) + 7 + keep_every;
-        if idx < v.len() {
-            v.remove(idx);
-        }
-    }
-    let split_at = v.len() / 3;
-    let (left, right) = v.split_at(split_at);
-    let mut result = left;
-    result.append(right);
-    let expected: Vec<i32> = result.iter().cloned().collect();
-    for (i, want) in expected.iter().enumerate() {
-        match result.get(i) {
-            Some(got) if got == want => {}
-            Some(got) => {
-                return PropertyResult::Fail(format!(
-                    "index {i} mismatch: iter says {want}, get says {got}"
-                ));
-            }
-            None => {
-                return PropertyResult::Fail(format!("index {i} missing; len = {}", result.len()));
+    let run = || -> Result<(), String> {
+        let mut v: Vector<i32> = (0..total as i32).collect();
+        for i in (0..200).rev() {
+            let idx = (i * (total / 200)) + 7 + keep_every;
+            if idx < v.len() {
+                v.remove(idx);
             }
         }
+        let split_at = v.len() / 3;
+        let (left, right) = v.split_at(split_at);
+        let mut result = left;
+        result.append(right);
+        let expected: Vec<i32> = result.iter().cloned().collect();
+        for (i, want) in expected.iter().enumerate() {
+            match result.get(i) {
+                Some(got) if got == want => {}
+                Some(got) => {
+                    return Err(format!(
+                        "index {i} mismatch: iter says {want}, get says {got}"
+                    ));
+                }
+                None => {
+                    return Err(format!("index {i} missing; len = {}", result.len()));
+                }
+            }
+        }
+        Ok(())
+    };
+    match catch_unwind(AssertUnwindSafe(run)) {
+        Ok(Ok(())) => PropertyResult::Pass,
+        Ok(Err(m)) => PropertyResult::Fail(m),
+        Err(_) => PropertyResult::Fail("Vector op panicked under buggy RRB density".into()),
     }
-    PropertyResult::Pass
 }
 
 /// `Vector::ptr_eq` must return `false` once two sibling vectors have diverged

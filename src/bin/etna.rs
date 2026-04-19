@@ -207,7 +207,7 @@ fn run_proptest_property(property: &str) -> Outcome {
             })
             .map_err(|e| e.to_string()),
         "EqSingleChunk" => runner
-            .run(&prop::collection::vec(any::<i32>(), 1..32), move |xs| {
+            .run(&prop::collection::vec(any::<i32>(), 32..61), move |xs| {
                 c.fetch_add(1, Ordering::Relaxed);
                 match property_eq_single_chunk(xs) {
                     PropertyResult::Pass | PropertyResult::Discard => Ok(()),
@@ -281,7 +281,7 @@ fn qc_ptr_eq_precedence(n: u16, slot: u16) -> TestResult {
 // expand it into a small Vec<i32> inside.
 fn qc_eq_single_chunk(len_byte: u8, seed: u64) -> TestResult {
     QC_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let len = (len_byte % 32 + 1) as usize;
+    let len = (len_byte as usize % 29) + 32;
     let mut xs = Vec::with_capacity(len);
     let mut x = seed;
     for _ in 0..len {
@@ -371,8 +371,15 @@ fn cc_ptr_eq_precedence((n, slot): (usize, usize)) -> Option<bool> {
     }
 }
 
-fn cc_eq_single_chunk(xs: Vec<i32>) -> Option<bool> {
+fn cc_eq_single_chunk_seeded(seed: u32) -> Option<bool> {
     CC_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let len = (seed as usize % 29) + 32;
+    let mut xs = Vec::with_capacity(len);
+    let mut x: u64 = seed as u64;
+    for _ in 0..len {
+        xs.push(x as i32);
+        x = x.wrapping_mul(6364136223846793005).wrapping_add(1);
+    }
     match property_eq_single_chunk(xs) {
         PropertyResult::Pass => Some(true),
         PropertyResult::Fail(_) => Some(false),
@@ -441,7 +448,8 @@ fn run_crabcheck_property(property: &str) -> Outcome {
         // running 20k cases would take hours. Cap to 4.
         "RrbDensityCheck" => cc_run_bounded(4, cc_rrb_density_check_seeded),
         "PtrEqPrecedence" => crabcheck_qc::quickcheck(cc_ptr_eq_precedence),
-        "EqSingleChunk" => crabcheck_qc::quickcheck(cc_eq_single_chunk),
+        // Default Vec<i32> generator almost never hits the len>=32 band; use seeded.
+        "EqSingleChunk" => cc_run_bounded(256, cc_eq_single_chunk_seeded),
         _ => {
             return (
                 Err(format!("Unknown property for crabcheck: {property}")),
@@ -549,7 +557,7 @@ fn run_hegel_property(property: &str) -> Outcome {
         "EqSingleChunk" => {
             Hegel::new(|tc: TestCase| {
                 HG_COUNTER.fetch_add(1, Ordering::Relaxed);
-                let len = (tc.draw(hgen::integers::<u8>()) % 32 + 1) as usize;
+                let len = (tc.draw(hgen::integers::<u8>()) as usize % 29) + 32;
                 let xs: Vec<i32> = (0..len).map(|_| tc.draw(hgen::integers::<i32>())).collect();
                 if let PropertyResult::Fail(m) = property_eq_single_chunk(xs) {
                     panic!("{}", m);
