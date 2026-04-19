@@ -273,7 +273,7 @@ impl<A: Clone> Node<A> {
                     None => break,
                     Some(child) => {
                         if size.is_size()
-                            && !child.is_completely_dense(level - 1)
+                            && !child.is_full()
                             && it.peek().is_some()
                         {
                             size = Size::table_from_size(&pool.size_pool, level, size.size());
