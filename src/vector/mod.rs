@@ -1738,12 +1738,7 @@ impl<A: Clone + Eq> PartialEq for Vector<A> {
         }
 
         match (&self.vector, &other.vector) {
-            (Single(_, left), Single(_, right)) => {
-                if cmp_chunk(left, right) {
-                    return true;
-                }
-                self.iter().eq(other.iter())
-            }
+            (Single(_, left), Single(_, right)) => cmp_chunk(left, right),
             (Full(_, left), Full(_, right)) => {
                 if left.length != right.length {
                     return false;
