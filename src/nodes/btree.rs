@@ -446,7 +446,7 @@ impl<A: BTreeValue> Node<A> {
                     path
                 }
                 None => {
-                    path.push((self, index - 1));
+                    path.push((self, index));
                     path
                 }
                 Some(ref node) => {
