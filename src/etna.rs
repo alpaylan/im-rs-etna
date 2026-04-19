@@ -26,37 +26,44 @@ pub enum PropertyResult {
 /// range iterator to stop early.
 pub fn property_path_next_backtrack(size_hint: u32, lo_hint: u32, span_hint: u32) -> PropertyResult {
     // Mirror the test added in the original fix (41d99725): build an OrdMap
-    // large enough to form a multi-level B-tree (NODE_SIZE^2 * 5), and for
-    // many lower-bound values — particularly absent ones that land past the
-    // last key of a leaf — compare `OrdMap::range(lo..hi)` against a
-    // `std::collections::BTreeMap` reference. The buggy `path_next` returns
-    // an empty path when the descent reaches a leaf whose keys are all
-    // smaller than `lo`, yielding a truncated iterator.
+    // large enough to form a multi-level B-tree (NODE_SIZE^2 * 5 = 20480
+    // entries), and sweep `range(..)` queries over NODE_SIZE*5 different
+    // lower-bound values near the tree's left edge and right edge. For many
+    // of these bounds `lo` lands on an absent key whose descent terminates
+    // at a leaf with no `children[index]` and no `keys.get(index)` — the
+    // exact shape of the buggy `path_next` `None` arm. The buggy version
+    // returns an empty path and truncates the iterator; the fix backtracks
+    // up the ancestors and keeps iterating.
     use std::collections::BTreeMap;
     const NODE_SIZE: usize = 64;
     let n = NODE_SIZE * NODE_SIZE * 5;
-    let lo = (lo_hint as usize) % (NODE_SIZE * 5);
     let span = (span_hint % 256 + 1) as usize;
+    let lo_start = (lo_hint as usize) % (NODE_SIZE * 5);
     let _ = size_hint;
     let data = (1..n).filter(|i| i % 2 == 0).map(|i| (i, ()));
     let bmap: BTreeMap<usize, ()> = data.clone().collect();
     let omap: OrdMap<usize, ()> = data.collect();
-    let got = omap.range(lo..lo + span).count();
-    let want = bmap.range(lo..lo + span).count();
-    if got != want {
-        return PropertyResult::Fail(format!(
-            "range({lo}..{}): got {got} keys, expected {want}",
-            lo + span
-        ));
-    }
-    let lo2 = n.saturating_sub(NODE_SIZE * 5) + lo;
-    let got2 = omap.range(lo2..lo2 + span).count();
-    let want2 = bmap.range(lo2..lo2 + span).count();
-    if got2 != want2 {
-        return PropertyResult::Fail(format!(
-            "range({lo2}..{}): got {got2} keys, expected {want2}",
-            lo2 + span
-        ));
+    // Two sweep windows: near the start of the key space and near the end,
+    // covering both forward and backward edge leaves.
+    for &base in &[lo_start, n.saturating_sub(NODE_SIZE * 5) + lo_start] {
+        for step in 0..(NODE_SIZE * 5) {
+            let lo = base + step;
+            let hi = lo + span;
+            let got = omap.range(lo..hi).count();
+            let want = bmap.range(lo..hi).count();
+            if got != want {
+                return PropertyResult::Fail(format!(
+                    "range({lo}..{hi}): got {got} keys, expected {want}"
+                ));
+            }
+            let got_upper = omap.range(..lo).count();
+            let want_upper = bmap.range(..lo).count();
+            if got_upper != want_upper {
+                return PropertyResult::Fail(format!(
+                    "range(..{lo}): got {got_upper} keys, expected {want_upper}"
+                ));
+            }
+        }
     }
     PropertyResult::Pass
 }
