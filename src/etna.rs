@@ -232,15 +232,12 @@ pub fn property_eq_single_chunk(xs: Vec<i32>) -> PropertyResult {
     if xs.len() < 32 || xs.len() > 60 {
         return PropertyResult::Discard;
     }
-    // Build `a` directly from xs; build `b` by prepending then popping a sentinel
-    // so the internal chunk layout diverges while element contents match.
+    // Two independent `collect` calls produce two `Single` vectors with the same
+    // elements but distinct chunk identities. Under the fix they compare equal
+    // (fallthrough to `iter().eq`). Under the bug they compare unequal because
+    // `cmp_chunk` is a pointer test that returns false.
     let a: Vector<i32> = xs.iter().cloned().collect();
-    let mut b: Vector<i32> = Vector::new();
-    b.push_front(i32::MIN);
-    for x in xs.iter().cloned() {
-        b.push_back(x);
-    }
-    b.pop_front();
+    let b: Vector<i32> = xs.iter().cloned().collect();
     if a == b {
         PropertyResult::Pass
     } else {
