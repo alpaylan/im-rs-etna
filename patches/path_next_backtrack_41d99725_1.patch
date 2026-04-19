@@ -1,0 +1,23 @@
+diff --git a/src/nodes/btree.rs b/src/nodes/btree.rs
+index 21f2f1e..e86d0c4 100644
+--- a/src/nodes/btree.rs
++++ b/src/nodes/btree.rs
+@@ -394,17 +394,7 @@ impl<A: BTreeValue> Node<A> {
+                         path.push((self, index));
+                         path
+                     }
+-                    None => {
+-                        // go back up to find next
+-                        while let Some((node, idx)) = path.last() {
+-                            if node.keys.len() == *idx {
+-                                path.pop();
+-                            } else {
+-                                break;
+-                            }
+-                        }
+-                        path
+-                    }
++                    None => Vec::new(),
+                 },
+                 Some(ref node) => {
+                     path.push((self, index));

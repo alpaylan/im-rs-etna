@@ -1,0 +1,15 @@
+diff --git a/src/vector/mod.rs b/src/vector/mod.rs
+index ffe229b..96d4e47 100644
+--- a/src/vector/mod.rs
++++ b/src/vector/mod.rs
+@@ -368,8 +368,8 @@ impl<A: Clone> Vector<A> {
+                     && cmp_chunk(&left.inner_f, &right.inner_f)
+                     && cmp_chunk(&left.inner_b, &right.inner_b)
+                     && cmp_chunk(&left.outer_b, &right.outer_b)
+-                    && ((left.middle.is_empty() && right.middle.is_empty())
+-                        || Ref::ptr_eq(&left.middle, &right.middle))
++                    && (left.middle.is_empty() && right.middle.is_empty())
++                    || Ref::ptr_eq(&left.middle, &right.middle)
+             }
+             _ => false,
+         }

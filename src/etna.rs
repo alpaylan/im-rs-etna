@@ -24,28 +24,41 @@ pub enum PropertyResult {
 /// reaches the end of a node without a child to recurse into, the buggy version
 /// returns an empty path instead of backtracking up to the ancestor, causing the
 /// range iterator to stop early.
-pub fn property_path_next_backtrack(size: u32, lo: u32, span: u32) -> PropertyResult {
-    if size == 0 || span == 0 {
-        return PropertyResult::Discard;
+pub fn property_path_next_backtrack(size_hint: u32, lo_hint: u32, span_hint: u32) -> PropertyResult {
+    // Mirror the test added in the original fix (41d99725): build an OrdMap
+    // large enough to form a multi-level B-tree (NODE_SIZE^2 * 5), and for
+    // many lower-bound values — particularly absent ones that land past the
+    // last key of a leaf — compare `OrdMap::range(lo..hi)` against a
+    // `std::collections::BTreeMap` reference. The buggy `path_next` returns
+    // an empty path when the descent reaches a leaf whose keys are all
+    // smaller than `lo`, yielding a truncated iterator.
+    use std::collections::BTreeMap;
+    const NODE_SIZE: usize = 64;
+    let n = NODE_SIZE * NODE_SIZE * 5;
+    let lo = (lo_hint as usize) % (NODE_SIZE * 5);
+    let span = (span_hint % 256 + 1) as usize;
+    let _ = size_hint;
+    let data = (1..n).filter(|i| i % 2 == 0).map(|i| (i, ()));
+    let bmap: BTreeMap<usize, ()> = data.clone().collect();
+    let omap: OrdMap<usize, ()> = data.collect();
+    let got = omap.range(lo..lo + span).count();
+    let want = bmap.range(lo..lo + span).count();
+    if got != want {
+        return PropertyResult::Fail(format!(
+            "range({lo}..{}): got {got} keys, expected {want}",
+            lo + span
+        ));
     }
-    let size = (size % 4096) as i32 + 2;
-    let lo = (lo as i32) % size;
-    let hi_excl = lo.saturating_add((span as i32) % size);
-    if hi_excl <= lo || hi_excl > size {
-        return PropertyResult::Discard;
+    let lo2 = n.saturating_sub(NODE_SIZE * 5) + lo;
+    let got2 = omap.range(lo2..lo2 + span).count();
+    let want2 = bmap.range(lo2..lo2 + span).count();
+    if got2 != want2 {
+        return PropertyResult::Fail(format!(
+            "range({lo2}..{}): got {got2} keys, expected {want2}",
+            lo2 + span
+        ));
     }
-    let map: OrdMap<i32, i32> = (0..size).map(|i| (i, i)).collect();
-    let collected: Vec<i32> = map.range(lo..hi_excl).map(|(k, _)| *k).collect();
-    let expected: Vec<i32> = (lo..hi_excl).collect();
-    if collected == expected {
-        PropertyResult::Pass
-    } else {
-        PropertyResult::Fail(format!(
-            "range({lo}..{hi_excl}) over size {size} returned {} keys, expected {}",
-            collected.len(),
-            expected.len()
-        ))
-    }
+    PropertyResult::Pass
 }
 
 /// Upper-bound of an `OrdMap::range(..=hi)` or `range(..hi)` must exclude keys
@@ -82,17 +95,46 @@ pub fn property_range_off_by_one(size: u32, hi_factor: u32) -> PropertyResult {
 /// leave the size table stale, and subsequent operations panic with an index
 /// out-of-bounds.
 pub fn property_rrb_debug_pop(n: u32) -> PropertyResult {
-    let n = (n % 2048).saturating_add(256) as usize;
-    let build_and_pop = || {
-        let mut v: Vector<i32> = (0..(n as i32 * 2)).collect();
+    // Build a Vector with a non-trivial middle RRB tree, then pop_front past
+    // the outer/inner buffers so `Size::pop` is exercised on internal nodes.
+    // With the fix, `pop_front`'s side effect on the size table is preserved
+    // in release mode. With the bug, `size_table.pop_front()` lives inside
+    // `debug_assert_eq!` and is elided in release, leaving the size table
+    // stale. Subsequent random-access indexing reads a corrupt Size::Table
+    // entry and panics with index-out-of-bounds.
+    let n = (n % 2048).saturating_add(512) as usize;
+    let run = || -> Result<(), String> {
+        let mut v: Vector<i32> = (0..(n as i32 * 3)).collect();
         for _ in 0..n {
             v.pop_front();
         }
-        v.len()
+        let by_iter: Vec<i32> = v.iter().cloned().collect();
+        if by_iter.len() != v.len() {
+            return Err(format!(
+                "iter length {} disagrees with Vector::len {}",
+                by_iter.len(),
+                v.len()
+            ));
+        }
+        for (i, expected) in by_iter.iter().enumerate() {
+            match v.get(i) {
+                Some(got) if got == expected => {}
+                Some(got) => {
+                    return Err(format!("index {i}: iter says {expected}, get says {got}"));
+                }
+                None => {
+                    return Err(format!(
+                        "index {i}: iter has value but get returned None (len={})",
+                        v.len()
+                    ));
+                }
+            }
+        }
+        Ok(())
     };
-    match catch_unwind(AssertUnwindSafe(build_and_pop)) {
-        Ok(len) if len == n => PropertyResult::Pass,
-        Ok(len) => PropertyResult::Fail(format!("expected length {n} after pops, got {len}")),
+    match catch_unwind(AssertUnwindSafe(run)) {
+        Ok(Ok(())) => PropertyResult::Pass,
+        Ok(Err(m)) => PropertyResult::Fail(m),
         Err(_) => PropertyResult::Fail("Vector::pop_front panicked in release mode".into()),
     }
 }
@@ -168,7 +210,12 @@ pub fn property_ptr_eq_precedence(size: u32, slot: u32) -> PropertyResult {
 /// structurally distinct single-chunk vectors with the same elements compared
 /// unequal.
 pub fn property_eq_single_chunk(xs: Vec<i32>) -> PropertyResult {
-    if xs.is_empty() {
+    // Need enough elements so the Vector is in the `Single` chunk form rather
+    // than the small `Inline` form — below the inline threshold both sides hit
+    // the `_ => iter().eq()` fallback which is correct for either version.
+    // CHUNK_SIZE is 64; 32..=60 safely forces `Single` without crossing into
+    // `Full` RRB territory.
+    if xs.len() < 32 || xs.len() > 60 {
         return PropertyResult::Discard;
     }
     // Build `a` directly from xs; build `b` by prepending then popping a sentinel

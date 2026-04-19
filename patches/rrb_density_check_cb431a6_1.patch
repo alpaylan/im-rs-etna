@@ -1,0 +1,13 @@
+diff --git a/src/nodes/rrb.rs b/src/nodes/rrb.rs
+index 9fbc999..6e71ef0 100644
+--- a/src/nodes/rrb.rs
++++ b/src/nodes/rrb.rs
+@@ -273,7 +273,7 @@ impl<A: Clone> Node<A> {
+                     None => break,
+                     Some(child) => {
+                         if size.is_size()
+-                            && !child.is_completely_dense(level - 1)
++                            && !child.is_full()
+                             && it.peek().is_some()
+                         {
+                             size = Size::table_from_size(&pool.size_pool, level, size.size());

@@ -1,0 +1,14 @@
+diff --git a/src/nodes/rrb.rs b/src/nodes/rrb.rs
+index 9fbc999..a98a7c5 100644
+--- a/src/nodes/rrb.rs
++++ b/src/nodes/rrb.rs
+@@ -107,8 +107,7 @@ impl Size {
+                 let size_table = PoolRef::make_mut(pool, size_ref);
+                 match side {
+                     Left => {
+-                        let first = size_table.pop_front();
+-                        debug_assert_eq!(value, first);
++                        debug_assert_eq!(value, size_table.pop_front());
+                         for entry in size_table.iter_mut() {
+                             *entry -= value;
+                         }

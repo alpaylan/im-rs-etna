@@ -26,9 +26,13 @@ fn expect_pass(r: PropertyResult, what: &str) {
 // exercises the missing backtrack.
 #[test]
 fn witness_path_next_backtrack_case_ordmap_1000() {
+    // lo=0, span=7 sweeps absent keys adjacent to each leaf boundary in the
+    // first few nodes. The buggy `path_next` truncates the iterator when the
+    // descent lands past the last key of an interior leaf, so the reference
+    // BTreeMap produces a larger count.
     expect_pass(
-        property_path_next_backtrack(1000, 100, 100),
-        "OrdMap range(100..200)",
+        property_path_next_backtrack(0, 0, 7),
+        "OrdMap range near leaf boundaries",
     );
 }
 
@@ -54,11 +58,15 @@ fn witness_range_off_by_one_case_odd_upper_bound() {
 // panic.
 #[test]
 fn witness_rrb_debug_pop_case_release_pop_front() {
-    // property_rrb_debug_pop uses catch_unwind internally so this test is safe
-    // to run as a regular #[test] even when the mutation is active.
+    // A Vector of ~3000 elements forces a non-trivial middle RRB tree; after
+    // many pop_front calls the internal size table has transitioned from
+    // Size::Size to Size::Table. Under the bug the Left/Table arm's
+    // `debug_assert_eq!` no longer mutates the table in release builds, so
+    // random-access `get(i)` disagrees with iteration once the corrupt
+    // size-table entry is indexed.
     expect_pass(
-        property_rrb_debug_pop(5000),
-        "5000 pop_front calls in release mode",
+        property_rrb_debug_pop(1000),
+        "pop_front consistency across RRB middle tree",
     );
 }
 
@@ -94,8 +102,11 @@ fn witness_ptr_eq_precedence_case_diverged_outer() {
 // same elements but distinct internal chunk identities then compare unequal.
 #[test]
 fn witness_eq_single_chunk_case_small_vec() {
+    // A 40-element i32 vector lives in the `Single` chunk form, where the
+    // specialized `PartialEq` arm fires. Below the inline threshold both
+    // sides fall through to the correct `iter().eq()` fallback.
     expect_pass(
-        property_eq_single_chunk(vec![1, 2, 3]),
+        property_eq_single_chunk((0..40).collect()),
         "Single/Single eq via different build paths",
     );
 }
