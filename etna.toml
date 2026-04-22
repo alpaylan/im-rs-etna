@@ -1,82 +1,160 @@
-# ETNA workload index for im-rs.
-#
-# One [[variant]] per injected mutation. Source of truth for variant->property
-# mapping. Every other fact is derivable from the source tree:
-#   - ls patches/*.patch                          (patch-based variants)
-#   - grep -rn "pub fn property_" src/etna.rs     (property functions)
-#   - grep -rn "fn witness_.*_case_" tests/       (witness tests)
-#
-# Base commit for this workload is HEAD of master on this tree. Every
-# etna/<variant> branch is master + exactly one patch applied on top.
+name = "im-rs"
+language = "rust"
+crate = "im"
+base_commit = "dd5a4351e2913c823e8f1d71723cb979c0df058f"
 
-[[variant]]
-name = "path_next_backtrack_41d99725_1"
-property = "path_next_backtrack"
-injection = "patch"
+[[tasks]]
+mutations = ["path_next_backtrack_41d99725_1"]
+
+[tasks.source]
+repo = "https://github.com/bodil/im-rs"
+commits = ["41d9972538d49ffa3964e3a94109619ce053ef36"]
+commit_subjects = ["Fix btree::Node::path_{next/prev}"]
+summary = "`Node::path_next` returned `Vec::new()` whenever its descent landed on a key the tree didn't contain and the current leaf had no candidate, instead of walking back up to find the next ancestor key. As a result `OrdMap::range(lo..hi)` silently under-counted when `lo` fell past the last key of some leaf node."
+
+[tasks.injection]
+kind = "patch"
+files = ["src/nodes/btree.rs"]
+locations = [{ file = "src/nodes/btree.rs" }]
 patch = "patches/path_next_backtrack_41d99725_1.patch"
-source_commit = "41d9972538d49ffa3964e3a94109619ce053ef36"
-witnesses = [
-    "witness_path_next_backtrack_case_ordmap_1000",
-]
-frameworks = ["proptest", "quickcheck", "crabcheck", "hegel"]
-files = ["src/nodes/btree.rs"]
 
-[[variant]]
-name = "range_off_by_one_3f4e01a4_1"
-property = "range_off_by_one"
-injection = "patch"
+[tasks.bug]
+short_name = "path_next_backtrack"
+invariant = "`OrdMap::range(lo..hi).count()` must equal `std::collections::BTreeMap::range(lo..hi).count()` for the same key set, regardless of tree shape."
+how_triggered = "In `Node::path_next` the `Err(index) → children[index] = None → keys.get(index) = None` arm returns `Vec::new()` instead of backtracking up ancestors. When `lo` lands past the last key of a leaf, the iterator truncates mid-descent and `range().count()` reports fewer keys than the reference."
+
+[[tasks.tasks]]
+property = "PathNextBacktrack"
+witnesses = [
+  { test_fn = "witness_path_next_backtrack_case_ordmap_1000" },
+]
+
+[[tasks]]
+mutations = ["range_off_by_one_3f4e01a4_1"]
+
+[tasks.source]
+repo = "https://github.com/bodil/im-rs"
+commits = ["3f4e01a43254fe228d1ce64e47dfaf4edc8f4f19"]
+commit_subjects = ["Fix OrdMap::range including keys outside of requested range if end bound doesn't exist in tree."]
+summary = "`Node::path_prev` used `keys.get(index)` when the upper bound wasn't present in the tree, which pointed at the key one past `hi` instead of the key just before it. `OrdMap::range(..hi)` therefore leaked the next key into the iteration. The fix uses `keys.get(index - 1)` so the exclusive upper bound is honored."
+
+[tasks.injection]
+kind = "patch"
+files = ["src/nodes/btree.rs"]
+locations = [{ file = "src/nodes/btree.rs" }]
 patch = "patches/range_off_by_one_3f4e01a4_1.patch"
-source_commit = "3f4e01a43254fe228d1ce64e47dfaf4edc8f4f19"
-witnesses = [
-    "witness_range_off_by_one_case_odd_upper_bound",
-]
-frameworks = ["proptest", "quickcheck", "crabcheck", "hegel"]
-files = ["src/nodes/btree.rs"]
 
-[[variant]]
-name = "rrb_debug_pop_1209e823_1"
-property = "rrb_debug_pop"
-injection = "patch"
+[tasks.bug]
+short_name = "range_off_by_one"
+invariant = "`OrdMap::range(..hi)` must never yield a key `k >= hi`."
+how_triggered = "`Node::path_prev` uses `keys.get(index)` instead of `keys.get(index - 1)` when the upper bound is absent from the tree, so the iterator leaks the key immediately past `hi`."
+
+[[tasks.tasks]]
+property = "RangeOffByOne"
+witnesses = [
+  { test_fn = "witness_range_off_by_one_case_odd_upper_bound" },
+]
+
+[[tasks]]
+mutations = ["rrb_debug_pop_1209e823_1"]
+
+[tasks.source]
+repo = "https://github.com/bodil/im-rs"
+commits = ["1209e823b633c7ac73ae686896382b7207a907ac"]
+commit_subjects = ["RRB size table: don't pop conditional on cfg(debug_assertions)"]
+summary = "The `Size::Table` left-pop path put the side-effectful `size_table.pop_front()` call inside a `debug_assert_eq!`. In release builds the entire macro body was compiled out, so the size table never shrank, and later random-access indexing after `pop_front` read stale entries and panicked. The fix hoists the pop above the debug-only assertion."
+
+[tasks.injection]
+kind = "patch"
+files = ["src/nodes/rrb.rs"]
+locations = [{ file = "src/nodes/rrb.rs" }]
 patch = "patches/rrb_debug_pop_1209e823_1.patch"
-source_commit = "1209e823b633c7ac73ae686896382b7207a907ac"
-witnesses = [
-    "witness_rrb_debug_pop_case_release_pop_front",
-]
-frameworks = ["proptest", "quickcheck", "crabcheck", "hegel"]
-files = ["src/nodes/rrb.rs"]
 
-[[variant]]
-name = "rrb_density_check_cb431a6_1"
-property = "rrb_density_check"
-injection = "patch"
+[tasks.bug]
+short_name = "rrb_debug_pop"
+invariant = "After a sequence of `Vector::pop_front` operations, `v.get(i)` must agree with `v.iter().nth(i)` for every valid `i`."
+how_triggered = "The `Size::Table` Left-pop arm places the side-effectful `size_table.pop_front()` inside `debug_assert_eq!`. In release builds the entire macro body is compiled out, the size table is never popped, and later random-access indexing consults a stale entry and panics with index-out-of-bounds."
+
+[[tasks.tasks]]
+property = "RrbDebugPop"
+witnesses = [
+  { test_fn = "witness_rrb_debug_pop_case_release_pop_front" },
+]
+
+[[tasks]]
+mutations = ["rrb_density_check_cb431a6_1"]
+
+[tasks.source]
+repo = "https://github.com/bodil/im-rs"
+commits = ["cb431a612a39fb7973f7a7218771b5b3fd43d979"]
+commit_subjects = ["Many Vector merging/splitting bug fixes."]
+summary = "`Node::parent` used `child.is_full()` (a local capacity check) to decide whether to keep compact `Size::Size` accounting for a new parent. At level 2+, a nominally full child whose grandchildren are sparse still warrants the full `Size::Table` accounting — the fix substitutes `is_completely_dense(level - 1)` so sparse grand-children force `Size::Table`."
+
+[tasks.injection]
+kind = "patch"
+files = ["src/nodes/rrb.rs"]
+locations = [{ file = "src/nodes/rrb.rs" }]
 patch = "patches/rrb_density_check_cb431a6_1.patch"
-source_commit = "cb431a612a39fb7973f7a7218771b5b3fd43d979"
-witnesses = [
-    "witness_rrb_density_check_case_level2_rrb",
-]
-frameworks = ["proptest", "quickcheck", "crabcheck", "hegel"]
-files = ["src/nodes/rrb.rs"]
 
-[[variant]]
-name = "ptr_eq_precedence_f744912_1"
-property = "ptr_eq_precedence"
-injection = "patch"
+[tasks.bug]
+short_name = "rrb_density_check"
+invariant = "After `remove`/`split_at`/`append` on a level-2+ RRB tree, `v.get(i)` must agree with `v.iter()` for all indices."
+how_triggered = "`Node::parent` uses `child.is_full()` instead of `child.is_completely_dense(level - 1)` to decide whether to keep `Size::Size` accounting. When a level-2 node has a nominally-full child whose grandchildren are sparse, it wrongly stays `Size::Size`, and subsequent index arithmetic lands off-by-several."
+
+[[tasks.tasks]]
+property = "RrbDensityCheck"
+witnesses = [
+  { test_fn = "witness_rrb_density_check_case_level2_rrb" },
+]
+
+[[tasks]]
+mutations = ["ptr_eq_precedence_f744912_1"]
+
+[tasks.source]
+repo = "https://github.com/bodil/im-rs"
+commits = ["f7449127b83327b82d82690e8333c552014149c8"]
+commit_subjects = ["Fix logic error in Vector::ptr_eq & PartialEq"]
+summary = "`Vector::ptr_eq` was written as `a && b || c && d || e` without parentheses, so Rust's `&&` precedence caused the final `||` branch to act as a fallback that ignored outer/inner chunk divergence. After `a.set(i, x)` on a clone, `ptr_eq` reduced to comparing the middle tree pointer alone and returned `true`. The fix adds parentheses so all three pointer groups must match."
+
+[tasks.injection]
+kind = "patch"
+files = ["src/vector/mod.rs"]
+locations = [{ file = "src/vector/mod.rs" }]
 patch = "patches/ptr_eq_precedence_f744912_1.patch"
-source_commit = "f7449127b83327b82d82690e8333c552014149c8"
-witnesses = [
-    "witness_ptr_eq_precedence_case_diverged_outer",
-]
-frameworks = ["proptest", "quickcheck", "crabcheck", "hegel"]
-files = ["src/vector/mod.rs"]
 
-[[variant]]
-name = "eq_single_chunk_005193a_1"
-property = "eq_single_chunk"
-injection = "patch"
-patch = "patches/eq_single_chunk_005193a_1.patch"
-source_commit = "005193a268e4e9939a50eff0fe6e4f232a1facf4"
+[tasks.bug]
+short_name = "ptr_eq_precedence"
+invariant = "After `a.set(i, x)` the cloned vector `b = a.clone()` diverges at index `i`, so `a.ptr_eq(&b)` must be `false`."
+how_triggered = "Without parentheses around the final `||`, the `&&` conjunction binds tighter. `ptr_eq` reduces to an identity test on the middle tree pointer alone and silently ignores diverging outer or inner chunks."
+
+[[tasks.tasks]]
+property = "PtrEqPrecedence"
 witnesses = [
-    "witness_eq_single_chunk_case_small_vec",
+  { test_fn = "witness_ptr_eq_precedence_case_diverged_outer" },
 ]
-frameworks = ["proptest", "quickcheck", "crabcheck", "hegel"]
+
+[[tasks]]
+mutations = ["eq_single_chunk_005193a_1"]
+
+[tasks.source]
+repo = "https://github.com/bodil/im-rs"
+commits = ["005193a268e4e9939a50eff0fe6e4f232a1facf4"]
+commit_subjects = ["Fix incomplete `eq` implementation for single chunks."]
+summary = "The nightly-only `has_specialisation` specialization for `Single == Single` delegated to `cmp_chunk`, which compares chunk *identities* — returning `false` for two structurally-identical-but-distinct chunks. The fix falls through to element-wise comparison when identities differ so that `Vector` equality agrees with iterator equality on all specialisation cfgs."
+
+[tasks.injection]
+kind = "patch"
 files = ["src/vector/mod.rs"]
+locations = [{ file = "src/vector/mod.rs" }]
+patch = "patches/eq_single_chunk_005193a_1.patch"
+
+[tasks.bug]
+short_name = "eq_single_chunk"
+invariant = "`PartialEq` on two `Vector<i32>` values holding the same element sequence must return `true`, regardless of internal layout (`Single` vs `Full`, shared or fresh chunks)."
+how_triggered = "The specialized `Single == Single` arm returns `cmp_chunk(left, right)` directly; `cmp_chunk` returns `false` when the two chunks have distinct identities. Two structurally-different single-chunk vectors with identical elements then compare unequal. Only reachable on the `has_specialisation` nightly cfg — base build uses the fallback `iter().eq()`, which is always correct."
+
+[[tasks.tasks]]
+property = "EqSingleChunk"
+witnesses = [
+  { test_fn = "witness_eq_single_chunk_case_small_vec" },
+]

@@ -4,3 +4,7 @@ dist/
 Cargo.lock
 /im-rc
 .hegel/
+.marauders/
+.migration-cache/
+etna.log
+progress.jsonl
