@@ -1,5 +1,6 @@
 name = "im-rs"
 language = "rust"
+strategies = ["proptest", "quickcheck", "crabcheck", "hegel"]
 crate = "im"
 base_commit = "dd5a4351e2913c823e8f1d71723cb979c0df058f"
 
