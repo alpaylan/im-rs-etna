@@ -41,9 +41,9 @@ bitmaps = "2"
 sized-chunks = "0.6.4"
 rand_core = "0.6"
 rand_xoshiro = "0.6"
-quickcheck = { path = "/Users/akeles/Programming/projects/PbtBenchmark/quickcheck", features = ["etna"] }
+quickcheck = { git = "https://github.com/alpaylan/quickcheck.git", branch = "master", features = ["etna"] }
 proptest = "1"
-crabcheck = { path = "/Users/akeles/Programming/projects/PbtBenchmark/crabcheck" }
+crabcheck = { git = "https://github.com/alpaylan/crabcheck.git", branch = "main" }
 hegeltest = "0.3.7"
 serde = { version = "1", optional = true }
 rayon = { version = "1", optional = true }
