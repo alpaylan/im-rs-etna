@@ -62,3 +62,7 @@ proptest-derive = "0.3"
 [[bin]]
 name = "etna"
 path = "src/bin/etna.rs"
+
+[[bin]]
+name = "etna-faultloc"
+path = "src/bin/etna-faultloc.rs"

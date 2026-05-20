@@ -155,43 +155,152 @@ pub fn property_rrb_debug_pop(n: u32) -> PropertyResult {
 /// grandchildren. Index lookups then disagree with linear iteration on large
 /// append-split sequences.
 pub fn property_rrb_density_check(n_removed: u32) -> PropertyResult {
-    // These constants are chosen to force a level-2 RRB tree with sparse leaves.
-    // 64^3 = 262_144; +640 guarantees a full top-level node plus leftovers.
-    let total = 64 * 64 * 64 + 640;
+    // Frozen-witness path: drive the canonical bug-triggering shape with
+    // `keep_every` derived from `n_removed`. Always triggers under the buggy
+    // version. Generators should call `property_rrb_density_check_shape` for
+    // a wider distribution of Vector shapes.
+    property_rrb_density_check_shape(n_removed, 0, 0)
+}
+
+/// Wider variant of [`property_rrb_density_check`] used by framework adapters.
+///
+/// `size_factor` and `op_mode` widen the generator distribution — most random
+/// inputs build a Vector that does *not* exercise the level-2 RRB sparse-child
+/// shape that triggers the bug (so the property passes), while a slice of the
+/// input space still hits the canonical bug-triggering build sequence.
+///
+/// * `size_factor == 0` selects the canonical 262 144+640-element RRB tree
+///   (the one the witness uses); any non-zero value scales the build down to a
+///   smaller Vector that does not form a level-2 sparse RRB tree.
+/// * `op_mode` selects which post-build operation sequence runs. Most modes
+///   skip the remove/split/append combo, so on the buggy build the property
+///   still passes for those modes.
+pub fn property_rrb_density_check_shape(
+    n_removed: u32,
+    size_factor: u32,
+    op_mode: u32,
+) -> PropertyResult {
+    // Choose the build size. `size_factor == 0` reproduces the canonical
+    // 262 144+640-element shape; other values produce smaller Vectors whose
+    // RRB tree is not level-2-sparse enough to hit the bug.
+    let total: usize = match size_factor % 8 {
+        0 => 64 * 64 * 64 + 640,
+        1 => 256,
+        2 => 1024,
+        3 => 4096,
+        4 => 64 * 64 + 32,
+        5 => 64 * 64 * 4 + 17,
+        6 => 64 * 64 * 16,
+        _ => 64 * 64 * 64 + 640,
+    };
     let keep_every = (n_removed % 16 + 1) as usize;
     let run = || -> Result<(), String> {
         let mut v: Vector<i32> = (0..total as i32).collect();
-        for i in (0..200).rev() {
-            let idx = (i * (total / 200)) + 7 + keep_every;
-            if idx < v.len() {
-                v.remove(idx);
-            }
-        }
-        let split_at = v.len() / 3;
-        let (left, right) = v.split_at(split_at);
-        let mut result = left;
-        result.append(right);
-        let expected: Vec<i32> = result.iter().cloned().collect();
-        for (i, want) in expected.iter().enumerate() {
-            match result.get(i) {
-                Some(got) if got == want => {}
-                Some(got) => {
-                    return Err(format!(
-                        "index {i} mismatch: iter says {want}, get says {got}"
-                    ));
+        // op_mode selects whether to perform the remove/split/append combo
+        // and how. Mode 0 reproduces the canonical witness sequence.
+        let mode = op_mode % 6;
+        match mode {
+            0 => {
+                // Canonical witness sequence — sparse remove + split + append.
+                for i in (0..200).rev() {
+                    let idx = (i * (total / 200.max(1))) + 7 + keep_every;
+                    if idx < v.len() {
+                        v.remove(idx);
+                    }
                 }
-                None => {
-                    return Err(format!("index {i} missing; len = {}", result.len()));
+                let split_at = v.len() / 3;
+                let (left, right) = v.split_at(split_at);
+                let mut result = left;
+                result.append(right);
+                check_round_trip(&result)
+            }
+            1 => {
+                // Pop-only: never invokes split/append so the buggy `parent`
+                // is not exercised — distribution-widening pass.
+                let pops = (keep_every * 7).min(v.len() / 2);
+                for _ in 0..pops {
+                    v.pop_back();
+                }
+                check_round_trip(&v)
+            }
+            2 => {
+                // Push-only with a few inserts: never goes through `parent`
+                // restructuring on sparse grand-children.
+                for i in 0..(keep_every * 3) {
+                    v.push_back((i as i32).wrapping_mul(7));
+                }
+                for i in 0..keep_every.min(8) {
+                    let idx = i.saturating_mul(31) % v.len().max(1);
+                    v.insert(idx, i as i32);
+                }
+                check_round_trip(&v)
+            }
+            3 => {
+                // Split-only without the post-append rebalance.
+                let split_at = (v.len() / 5) + keep_every;
+                if split_at < v.len() {
+                    let (left, _right) = v.split_at(split_at);
+                    check_round_trip(&left)
+                } else {
+                    check_round_trip(&v)
                 }
             }
+            4 => {
+                // Append two halves of the same Vector — exercises append on
+                // a balanced tree without introducing sparse leaves.
+                let half = v.len() / 2;
+                let (left, right) = v.split_at(half);
+                let mut result = left;
+                result.append(right);
+                check_round_trip(&result)
+            }
+            5 => {
+                // Sparse remove + split + append (the canonical bug-trigger
+                // path) — same as mode 0 but only fires when `size_factor`
+                // also lands on a level-2 RRB shape.
+                let stride = (total / 200).max(1);
+                for i in (0..200).rev() {
+                    let idx = (i * stride) + 7 + keep_every;
+                    if idx < v.len() {
+                        v.remove(idx);
+                    }
+                }
+                let split_at = v.len() / 3;
+                if split_at > 0 && split_at < v.len() {
+                    let (left, right) = v.split_at(split_at);
+                    let mut result = left;
+                    result.append(right);
+                    check_round_trip(&result)
+                } else {
+                    check_round_trip(&v)
+                }
+            }
+            _ => check_round_trip(&v),
         }
-        Ok(())
     };
     match catch_unwind(AssertUnwindSafe(run)) {
         Ok(Ok(())) => PropertyResult::Pass,
         Ok(Err(m)) => PropertyResult::Fail(m),
         Err(_) => PropertyResult::Fail("Vector op panicked under buggy RRB density".into()),
     }
+}
+
+fn check_round_trip(v: &Vector<i32>) -> Result<(), String> {
+    let expected: Vec<i32> = v.iter().cloned().collect();
+    for (i, want) in expected.iter().enumerate() {
+        match v.get(i) {
+            Some(got) if got == want => {}
+            Some(got) => {
+                return Err(format!(
+                    "index {i} mismatch: iter says {want}, get says {got}"
+                ));
+            }
+            None => {
+                return Err(format!("index {i} missing; len = {}", v.len()));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// `Vector::ptr_eq` must return `false` once two sibling vectors have diverged

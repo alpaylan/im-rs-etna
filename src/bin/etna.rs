@@ -17,7 +17,8 @@ use crabcheck::quickcheck as crabcheck_qc;
 use hegel::{generators as hgen, Hegel, Settings as HegelSettings, TestCase};
 use im::etna::{
     property_eq_single_chunk, property_path_next_backtrack, property_ptr_eq_precedence,
-    property_range_off_by_one, property_rrb_debug_pop, property_rrb_density_check, PropertyResult,
+    property_range_off_by_one, property_rrb_debug_pop, property_rrb_density_check,
+    property_rrb_density_check_shape, PropertyResult,
 };
 use proptest::prelude::*;
 use proptest::test_runner::{Config as ProptestConfig, TestCaseError, TestRunner};
@@ -179,22 +180,31 @@ fn run_proptest_property(property: &str) -> Outcome {
             })
             .map_err(|e| e.to_string()),
         "RrbDensityCheck" => {
-            // This one is expensive (builds a 262k-element RRB tree). Dial
-            // cases way down.
+            // Widened generator: span keep_every (n_removed), build size,
+            // and post-build op mode so the distribution covers small &
+            // medium Vectors (which don't form a level-2 sparse RRB tree)
+            // and a variety of post-build op sequences. Only a slice of the
+            // input space hits the canonical bug-triggering shape, so the
+            // mean tests-to-failure under the buggy build is no longer 1.
+            // Each call still allocates a ~262k-element Vector when
+            // `size_factor==0`, so cap cases conservatively.
             let cfg2 = ProptestConfig {
-                cases: 4,
-                max_shrink_iters: 4,
+                cases: 12,
+                max_shrink_iters: 8,
                 ..ProptestConfig::default()
             };
             let mut rr = TestRunner::new(cfg2);
             let cc = counter.clone();
-            rr.run(&(0u32..16u32), move |n| {
-                cc.fetch_add(1, Ordering::Relaxed);
-                match property_rrb_density_check(n) {
-                    PropertyResult::Pass | PropertyResult::Discard => Ok(()),
-                    PropertyResult::Fail(m) => Err(TestCaseError::fail(m)),
-                }
-            })
+            rr.run(
+                &(0u32..16u32, 0u32..8u32, 0u32..6u32),
+                move |(n, sf, om)| {
+                    cc.fetch_add(1, Ordering::Relaxed);
+                    match property_rrb_density_check_shape(n, sf, om) {
+                        PropertyResult::Pass | PropertyResult::Discard => Ok(()),
+                        PropertyResult::Fail(m) => Err(TestCaseError::fail(m)),
+                    }
+                },
+            )
             .map_err(|e| e.to_string())
         }
         "PtrEqPrecedence" => runner
@@ -258,9 +268,13 @@ fn qc_rrb_debug_pop(n: u16) -> TestResult {
     }
 }
 
-fn qc_rrb_density_check(n: u8) -> TestResult {
+fn qc_rrb_density_check(n: u8, sf: u8, om: u8) -> TestResult {
     QC_COUNTER.fetch_add(1, Ordering::Relaxed);
-    match property_rrb_density_check(n as u32) {
+    // Widened: include size_factor and op_mode so most random inputs build a
+    // smaller Vector or skip the remove/split/append combo. Only inputs that
+    // happen to land on (sf == 0 || sf == 7) AND (om == 0 || om == 5) hit the
+    // canonical bug-triggering shape; the rest pass even on the buggy build.
+    match property_rrb_density_check_shape(n as u32, sf as u32, om as u32) {
         PropertyResult::Pass => TestResult::passed(),
         PropertyResult::Discard => TestResult::discard(),
         PropertyResult::Fail(_) => TestResult::failed(),
@@ -309,8 +323,8 @@ fn run_quickcheck_property(property: &str) -> Outcome {
         "RangeOffByOne" => qc.quicktest(qc_range_off_by_one as fn(u16, u16) -> TestResult),
         "RrbDebugPop" => qc.quicktest(qc_rrb_debug_pop as fn(u16) -> TestResult),
         "RrbDensityCheck" => {
-            let mut qcd = QuickCheck::new().tests(4).max_tests(16);
-            qcd.quicktest(qc_rrb_density_check as fn(u8) -> TestResult)
+            let mut qcd = QuickCheck::new().tests(12).max_tests(48);
+            qcd.quicktest(qc_rrb_density_check as fn(u8, u8, u8) -> TestResult)
         }
         "PtrEqPrecedence" => qc.quicktest(qc_ptr_eq_precedence as fn(u16, u16) -> TestResult),
         "EqSingleChunk" => qc.quicktest(qc_eq_single_chunk as fn(u8, u64) -> TestResult),
@@ -399,7 +413,25 @@ fn cc_path_next_backtrack_seeded(seed: u32) -> Option<bool> {
 
 fn cc_rrb_density_check_seeded(seed: u32) -> Option<bool> {
     CC_COUNTER.fetch_add(1, Ordering::Relaxed);
-    match property_rrb_density_check(seed) {
+    // Widened: derive (n_removed, size_factor, op_mode) from `seed` so the
+    // distribution spans small/medium Vectors and a variety of post-build
+    // op sequences. Only ~1/(8*6) of seeds land on the canonical
+    // bug-triggering shape, so under the buggy build crabcheck no longer
+    // hits the failure on the very first test.
+    // Bias the mapping with non-zero offsets so seed=0 doesn't immediately
+    // collide with (size_factor=0, op_mode=0).
+    let n_removed = seed;
+    let size_factor = seed
+        .wrapping_add(0x9E3779B9)
+        .wrapping_mul(2654435761)
+        .rotate_left(7)
+        % 8;
+    let op_mode = seed
+        .wrapping_add(0xC2B2AE35)
+        .wrapping_mul(40503)
+        .rotate_left(13)
+        % 6;
+    match property_rrb_density_check_shape(n_removed, size_factor, op_mode) {
         PropertyResult::Pass => Some(true),
         PropertyResult::Fail(_) => Some(false),
         PropertyResult::Discard => None,
@@ -444,9 +476,11 @@ fn run_crabcheck_property(property: &str) -> Outcome {
         "PathNextBacktrack" => cc_run_bounded(32, cc_path_next_backtrack_seeded),
         "RangeOffByOne" => crabcheck_qc::quickcheck(cc_range_off_by_one),
         "RrbDebugPop" => crabcheck_qc::quickcheck(cc_rrb_debug_pop),
-        // RrbDensityCheck's property allocates a 262k-element Vector per call;
-        // running 20k cases would take hours. Cap to 4.
-        "RrbDensityCheck" => cc_run_bounded(4, cc_rrb_density_check_seeded),
+        // RrbDensityCheck's canonical shape allocates a 262k-element Vector
+        // per call. With the widened generator most seeds build smaller
+        // Vectors so this is cheaper on average; cap to 64 so a few seeds
+        // still land on the bug-trigger shape.
+        "RrbDensityCheck" => cc_run_bounded(64, cc_rrb_density_check_seeded),
         "PtrEqPrecedence" => crabcheck_qc::quickcheck(cc_ptr_eq_precedence),
         // Default Vec<i32> generator almost never hits the len>=32 band; use seeded.
         "EqSingleChunk" => cc_run_bounded(256, cc_eq_single_chunk_seeded),
@@ -531,15 +565,21 @@ fn run_hegel_property(property: &str) -> Outcome {
             .run();
         }
         "RrbDensityCheck" => {
-            // This property is very expensive; cap test cases harder.
+            // Widened: hegel draws three independent generator dimensions
+            // (n_removed, size_factor, op_mode). Only a slice of the joint
+            // space lands on the canonical bug-triggering build sequence;
+            // the rest produce smaller Vectors or alternate op sequences.
+            // Allow more test cases than before since most are cheap.
             Hegel::new(|tc: TestCase| {
                 HG_COUNTER.fetch_add(1, Ordering::Relaxed);
                 let n = tc.draw(hgen::integers::<u8>()) as u32;
-                if let PropertyResult::Fail(m) = property_rrb_density_check(n) {
+                let sf = (tc.draw(hgen::integers::<u8>()) as u32) % 8;
+                let om = (tc.draw(hgen::integers::<u8>()) as u32) % 6;
+                if let PropertyResult::Fail(m) = property_rrb_density_check_shape(n, sf, om) {
                     panic!("{}", m);
                 }
             })
-            .settings(HegelSettings::new().test_cases(4).seed(Some(0xF100_A7)))
+            .settings(HegelSettings::new().test_cases(24).seed(Some(0xF100_A7)))
             .run();
         }
         "PtrEqPrecedence" => {
